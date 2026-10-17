@@ -1391,7 +1391,7 @@ ul,ol{ padding: 0; list-style: none; }
       if (t) fetch("/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(function () {});
       saveToken("");
       saveUser(null);
-      location.href = "/login.html";
+      location.href = "/login";
     });
   });
 

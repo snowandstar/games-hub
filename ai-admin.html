@@ -211,7 +211,7 @@ document.getElementById("cancelBtn").addEventListener("click", resetForm);
 
 (async () => {
   const u = getUser();
-  if (!u || !u.username) { location.href = "/login.html"; return; }
+  if (!u || !u.username) { location.href = "/login"; return; }
   if (!u.admin) { document.getElementById("listBox").innerHTML = `<div class="list-empty">需要管理员权限才能管理预设。</div>`; return; }
   loadList();
 })();

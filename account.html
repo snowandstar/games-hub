@@ -157,7 +157,7 @@ function setOk(id, text) {
 
 async function init() {
   me = getUser();
-  if (!me || !me.username) { location.href = "/login.html"; return; }
+  if (!me || !me.username) { location.href = "/login"; return; }
   document.getElementById("curName").textContent = me.username + (me.admin ? "（管理员）" : "");
   document.getElementById("curTag").textContent = "点击左侧头像可更换，历史留言同步更新";
   document.getElementById("adminSec").style.display = me.admin ? "block" : "none";
@@ -240,7 +240,7 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   if (t) fetch("/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(() => { });
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  location.href = "/login.html";
+  location.href = "/login";
 });
 
 init();
