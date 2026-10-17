@@ -137,8 +137,117 @@ function constEq(a, b) {
   for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return d === 0;
 }
-function clientIP(request) {
-  return request.headers.get("CF-Connecting-IP") || "unknown";
+// 读 cookie。用 split 而不是正则：正则里拼 name 既没必要，也容易在特殊字符上出岔子。
+// decodeURIComponent 对非法百分号序列会抛错（例如手工构造 "ghub_gate=%"），
+// 一旦抛出就是整站 500，所以这里必须吞掉异常按“没有 cookie”处理。
+function readCookie(request, name) {
+  const c = request.headers.get("Cookie") || "";
+  for (const part of c.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() !== name) continue;
+    const raw = part.slice(i + 1).trim();
+    try { return decodeURIComponent(raw); } catch (e) { return ""; }
+  }
+  return "";
+}
+
+// ---------- 门禁 cookie（HMAC 签名，页面路径 0 次 KV 读） ----------
+// 格式：base64url(username).<exp_ms>.<base64url(HMAC-SHA256(username + "." + exp, SESSION_SECRET))>
+// 页面门禁只决定“能不能看到页面壳”；写操作与权限仍走 getAuth() 的 KV 会话（sess:<token>），
+// 所以轮换 SESSION_SECRET 或删 sess: 依然能即时撤销 API 权限。
+const GATE_TTL_SEC = 3600 * 24 * 30; // 30 天，与 sess: 一致
+
+function b64uEncode(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64uDecode(str) {
+  const t = String(str).replace(/-/g, "+").replace(/_/g, "/");
+  const pad = t.length % 4 === 0 ? "" : "=".repeat(4 - (t.length % 4));
+  const bin = atob(t + pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function hmacSha256(payload, secret) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+}
+// 常数时间比较（字节级）。长度不等直接 false：HMAC-SHA256 长度恒为 32，
+// 长度不等必然是伪造值，提前返回不会泄漏比长度更多的信息。
+function constEqBytes(a, b) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+  return d === 0;
+}
+// 签发票据；SESSION_SECRET 未配置时返回 null（调用方据此选择降级路径）
+async function issueGate(username, env) {
+  if (!env.SESSION_SECRET) return null;
+  const exp = Date.now() + GATE_TTL_SEC * 1000;
+  const sig = await hmacSha256(username + "." + exp, env.SESSION_SECRET);
+  return `${b64uEncode(new TextEncoder().encode(username))}.${exp}.${b64uEncode(sig)}`;
+}
+// 校验票据；通过返回 username，否则 null。未配置 SESSION_SECRET 恒返回 null（不签发也不校验）
+async function verifyGate(value, env) {
+  if (!env.SESSION_SECRET || !value) return null;
+  const parts = String(value).split(".");
+  if (parts.length !== 3) return null;
+  let username = "";
+  let sig = null;
+  try {
+    username = new TextDecoder().decode(b64uDecode(parts[0]));
+    sig = b64uDecode(parts[2]);
+  } catch (e) {
+    return null; // 非法 base64 / 非法 UTF-8
+  }
+  if (!username) return null;
+  // exp 必须是纯数字：Number("1e9") 或含空白都会通过 Number()，用正则卡死格式
+  if (!/^\d{1,15}$/.test(parts[1])) return null;
+  const exp = Number(parts[1]);
+  const expect = await hmacSha256(username + "." + exp, env.SESSION_SECRET);
+  if (!constEqBytes(sig, expect)) return null;
+  if (Date.now() >= exp) return null;
+  return username;
+}
+// 哪些路径需要门禁
+// 1) 首页两个形式；2) 白名单页面（正则有右边界，见 fetch 内注释）；
+// 3) 排除带非 html 扩展名的静态资源（.json/.svg/.jpg/.swf…）——注意不能一刀切排除所有带扩展名的
+//    路径，否则 /minecraft.html 这种真页面会被绕过，门禁直接失效。
+const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin)(?:[\/\?#.]|$)/;
+const GATE_STATIC_EXT_RE = /\.(?!html?$)[a-z0-9]{1,8}$/i;
+function needsGate(path) {
+  if (path === "/" || path === "/index.html") return true;
+  if (GATE_STATIC_EXT_RE.test(path)) return false;
+  return GATE_PAGE_RE.test(path);
+}
+// next 参数校验：只接受站内相对路径，防开放重定向
+function safeNext(v) {
+  if (typeof v !== "string" || !v) return "/";
+  if (!v.startsWith("/") || v.startsWith("//")) return "/";
+  if (v.indexOf("\\") !== -1) return "/";
+  if (/[\x00-\x1f\x7f]/.test(v)) return "/"; // 换行/回车会拆出走私头
+  if (v.length > 200) return "/";
+  return v;
+}
+// 统一的 Cookie 串：HttpOnly + Secure + SameSite=Lax
+// - HttpOnly：前端只用 localStorage 的 token 调 API，不读 cookie，零副作用白赚一层 XSS 防护
+// - Secure：全站 HTTPS，无条件加
+// - SameSite=Lax：AI iframe 是跨站的，但它走 Bearer 不用 cookie，不受影响
+function cookieStr(name, value, maxAge) {
+  return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+}
+function clearCookieStr(name) {
+  return `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+}
+function readCookie(request, name) {
+  const c = request.headers.get("Cookie") || "";
+  const m = c.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : "";
 }
 function bearerToken(request) {
   const h = request.headers.get("Authorization") || "";
@@ -179,17 +288,33 @@ export default {
     }
 
     // 整站登录门禁：除登录页与 API 外，未登录一律跳转登录页
-    // 注意：正则末尾的 (?:[\/\?#.]|$) 是右边界，不能省。
-    // 省掉的话 /^\/game/ 会把 /games.json、/game-config.txt 这类静态数据文件也判成页面，
-    // 未登录访问它们会被 302 到登录页（前端 fetch('/games.json') 拿到 HTML，首页卡片直接空）。
-    const GATED = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin)(?:[\/\?#.]|$)/;
-    if (path === "/" || path === "/index.html" || GATED.test(path)) {
-      const c = request.headers.get("Cookie") || "";
-      const m = c.match(/(?:^|;\s*)ghub_token=([^;]+)/);
-      const t = m ? decodeURIComponent(m[1]) : "";
-      const sess = t ? await env.MSG_KV.get("sess:" + t, "json") : null;
-      if (!sess || !sess.exp || sess.exp < Date.now()) {
-        return Response.redirect(new URL("/login.html", url), 302);
+    // 路径判定见 needsGate()（白名单正则的右边界说明在那里）。
+    if (needsGate(path)) {
+      const gate = readCookie(request, "ghub_gate");
+      let pass = false;
+      if (env.SESSION_SECRET) {
+        // 主路径：HMAC 校验，纯 CPU，0 次 KV 读
+        pass = !!(await verifyGate(gate, env));
+      } else {
+        // 降级路径：SESSION_SECRET 未配置时退回 KV 会话校验（旧行为）。
+        // 既不因为缺配置就放行全部请求，也不返回 500。
+        const t = readCookie(request, "ghub_token");
+        if (t) {
+          const sess = await env.MSG_KV.get("sess:" + t, "json");
+          pass = !!(sess && sess.exp && sess.exp >= Date.now());
+        }
+      }
+      if (!pass) {
+        // 一跳到位：直接指到 /login（不再写 /login.html，Pages 会 308 到 /login，等于多一跳）
+        const next = safeNext(path + url.search);
+        return new Response(null, {
+          status: 302,
+          headers: {
+            "Location": "/login?next=" + encodeURIComponent(next),
+            "Cache-Control": "no-store",
+            ...SECURITY_HEADERS
+          }
+        });
       }
     }
 
@@ -301,14 +426,16 @@ export default {
       await clearFail(env, ip);
       const token = randHex(32);
       await env.MSG_KV.put("sess:" + token, JSON.stringify({ username, exp: Date.now() + SESSION_TTL * 1000 }), { expirationTtl: SESSION_TTL });
-      return new Response(JSON.stringify({ ok: true, token, username, admin: !!rec.admin }), {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-          "Set-Cookie": `ghub_token=${token}; Path=/; Max-Age=2592000; SameSite=Lax`,
-          ...SECURITY_HEADERS
-        }
+      // 门禁 cookie 与 KV 会话并行签发：页面门禁认前者，API 权限仍认后者
+      const gate = await issueGate(username, env);
+      const h = new Headers({
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...SECURITY_HEADERS
       });
+      h.append("Set-Cookie", cookieStr("ghub_token", token, SESSION_TTL));
+      if (gate) h.append("Set-Cookie", cookieStr("ghub_gate", gate, GATE_TTL_SEC));
+      return new Response(JSON.stringify({ ok: true, token, username, admin: !!rec.admin, avatar: rec.avatar || "" }), { headers: h });
     }
 
     if (path === "/api/auth/me") {
@@ -353,14 +480,16 @@ export default {
       if (oldTok) await env.MSG_KV.delete("sess:" + oldTok);
       const token = randHex(32);
       await env.MSG_KV.put("sess:" + token, JSON.stringify({ username: nn, exp: Date.now() + SESSION_TTL * 1000 }), { expirationTtl: SESSION_TTL });
-      return new Response(JSON.stringify({ ok: true, token, username: nn, admin: auth.admin, avatar: auth.avatar }), {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-          "Set-Cookie": `ghub_token=${token}; Path=/; Max-Age=2592000; SameSite=Lax`,
-          ...SECURITY_HEADERS
-        }
+      // 门禁 cookie 同步换成新用户名（否则改名后门禁还是旧名，页面照进但 API 对不上）
+      const gate = await issueGate(nn, env);
+      const h2 = new Headers({
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...SECURITY_HEADERS
       });
+      h2.append("Set-Cookie", cookieStr("ghub_token", token, SESSION_TTL));
+      if (gate) h2.append("Set-Cookie", cookieStr("ghub_gate", gate, GATE_TTL_SEC));
+      return new Response(JSON.stringify({ ok: true, token, username: nn, admin: auth.admin, avatar: auth.avatar }), { headers: h2 });
     }
 
     // 修改密码（需验证旧密码）
@@ -407,17 +536,18 @@ export default {
     if (path === "/api/auth/logout") {
       const token = bearerToken(request);
       if (token) await env.MSG_KV.delete("sess:" + token);
-      const c = request.headers.get("Cookie") || "";
-      const m = c.match(/(?:^|;\s*)ghub_token=([^;]+)/);
-      if (m) await env.MSG_KV.delete("sess:" + decodeURIComponent(m[1]));
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-          "Set-Cookie": "ghub_token=; Path=/; Max-Age=0; SameSite=Lax",
-          ...SECURITY_HEADERS
-        }
+      // 前端也可能不带 Authorization，只带 cookie，两种都要清
+      const cookieTok = readCookie(request, "ghub_token");
+      if (cookieTok) await env.MSG_KV.delete("sess:" + cookieTok);
+      const h = new Headers({
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...SECURITY_HEADERS
       });
+      // 两个 cookie 都要清：只清 ghub_token 的话门禁 cookie 还在，页面看起来还是登录态
+      h.append("Set-Cookie", clearCookieStr("ghub_token"));
+      h.append("Set-Cookie", clearCookieStr("ghub_gate"));
+      return new Response(JSON.stringify({ ok: true }), { headers: h });
     }
 
     // 留言板接口（Cloudflare KV 持久化；发留言必须登录，管理员可删除）
