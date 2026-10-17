@@ -75,20 +75,81 @@ body {
   </div>
   <input class="field" type="text" id="authUser" placeholder="用户名（2-20 位字母/数字/中文）" autocomplete="username">
   <input class="field" type="password" id="authPass" placeholder="密码（至少 6 位）" autocomplete="current-password">
+  <!-- 管理员邀请码：默认隐藏，仅 /login#setup 时露出，避免主动暴露该字段存在 -->
+  <input class="field" type="password" id="authSetup" placeholder="管理员邀请码" autocomplete="off" style="display:none">
   <div class="err" id="authErr"></div>
   <button class="btn" id="authSubmit" type="button">登录</button>
-  <div class="tip" id="authTip" style="display:none">第一个注册的账号自动成为管理员</div>
+  <div class="tip" id="authTip" style="display:none">注册成功后会自动登录</div>
 </div>
 
 <script>
 let mode = "login";
 const errEl = document.getElementById("authErr");
+
+// ---------- next 回跳 ----------
+// 规则与后端 safeNext() 保持一致，防开放重定向：只接受站内相对路径。
+function safeNext(v) {
+  if (typeof v !== "string" || !v) return "/";
+  if (!v.startsWith("/") || v.startsWith("//")) return "/";   // 挡 //evil.com
+  if (v.indexOf("\\") !== -1) return "/";                      // 挡 /\evil.com（浏览器会把 \ 当 /）
+  if (/[\x00-\x1f\x7f]/.test(v)) return "/";                   // 换行/回车会拆出走私头
+  if (v.length > 200) return "/";
+  return v;
+}
+const next = safeNext(new URLSearchParams(location.search).get("next"));
+
+// 自动回跳的循环保护：
+// 若 ghub_gate（门禁 cookie）缺失但 ghub_token 仍有效，跳回 next 会被门禁再弹回 /login，
+// 形成死循环。用 sessionStorage 记住"已经试过一次"，第二次就停在登录页让用户手动登录
+// —— 手动登录会重新签发 ghub_gate，循环自然解开。
+const TRIED_KEY = "ghub_login_autoredirect";
+function redirectTried() {
+  try { return sessionStorage.getItem(TRIED_KEY) === "1"; } catch (e) { return false; }
+}
+function markRedirectTried() {
+  try { sessionStorage.setItem(TRIED_KEY, "1"); } catch (e) {}
+}
+function clearRedirectTried() {
+  try { sessionStorage.removeItem(TRIED_KEY); } catch (e) {}
+}
+// replace 而非 href：登录页不该留在历史里，后退不会又回到登录页
+function goNext() {
+  clearRedirectTried();
+  location.replace(next);
+}
+
+// ---------- 已登录用户直接跳走 ----------
+// 注意：后端 getAuth() 只读 Authorization: Bearer，不读 cookie，
+// 所以这里必须显式带上 localStorage 里的 ghub_token。
+// 任何失败（无 token / 已过期 / 网络错误）都静默显示表单，不卡加载态、不报错。
+async function skipIfLoggedIn() {
+  let token = "";
+  try { token = localStorage.getItem("ghub_token") || ""; } catch (e) {}
+  if (!token) return;
+  try {
+    const res = await fetch("/api/auth/me", {
+      headers: { "Authorization": "Bearer " + token },
+      cache: "no-store"
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.ok) return;      // 未登录或会话已过期 -> 正常显示表单
+    if (redirectTried()) return;       // 上次跳转被弹回过 -> 不再跳，等用户手动登录补发 gate cookie
+    markRedirectTried();
+    location.replace(next);
+  } catch (e) {
+    // 网络错误：正常显示表单
+  }
+}
+
 function setMode(m) {
   mode = m;
   document.getElementById("tabLogin").classList.toggle("on", m === "login");
   document.getElementById("tabReg").classList.toggle("on", m === "register");
   document.getElementById("authSubmit").textContent = m === "login" ? "登录" : "注册";
   document.getElementById("authTip").style.display = m === "register" ? "" : "none";
+  // 邀请码只在注册模式 + 显式 #setup 时露出
+  document.getElementById("authSetup").style.display =
+    (m === "register" && location.hash === "#setup") ? "" : "none";
   errEl.textContent = "";
 }
 async function submit() {
@@ -100,28 +161,42 @@ async function submit() {
   btn.disabled = true;
   btn.textContent = "请稍候…";
   try {
+    const body = { username: u, password: p };
+    const setupEl = document.getElementById("authSetup");
+    // 仅在输入框可见且非空时带上 setup_code，普通注册不带该字段
+    if (mode === "register" && setupEl.style.display !== "none") {
+      const sc = setupEl.value.trim();
+      if (sc) body.setup_code = sc;
+    }
     const res = await fetch("/api/auth/" + (mode === "login" ? "login" : "register"), {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: u, password: p })
+      body: JSON.stringify(body)
     });
     const d = await res.json();
     if (!res.ok) { errEl.textContent = d.error || "操作失败"; btn.disabled = false; btn.textContent = mode === "login" ? "登录" : "注册"; return; }
     if (mode === "register") {
+      // 注册接口不返回 token、也不签门禁 cookie，必须再调一次 login 才能进站
       const res2 = await fetch("/api/auth/login", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: u, password: p })
       });
       const d2 = await res2.json();
-      if (d2.ok) {
-        localStorage.setItem("ghub_token", d2.token);
-        localStorage.setItem("ghub_user", JSON.stringify({ username: d2.username, admin: d2.admin }));
+      if (!d2.ok) {
+        // 不能带着"注册成功但没有门禁 cookie"的状态跳走，否则会被门禁弹回登录页
+        errEl.textContent = "注册成功，但自动登录失败，请手动登录一次。";
+        setMode("login");
+        btn.disabled = false;
+        btn.textContent = "登录";
+        return;
       }
-      if (d.admin) alert("注册成功！你是第一个注册的账号，已自动成为管理员。");
+      localStorage.setItem("ghub_token", d2.token);
+      localStorage.setItem("ghub_user", JSON.stringify({ username: d2.username, admin: d2.admin }));
+      if (d2.admin) alert("注册成功！已用管理员邀请码注册为管理员。");
     } else {
       localStorage.setItem("ghub_token", d.token);
       localStorage.setItem("ghub_user", JSON.stringify({ username: d.username, admin: d.admin }));
     }
-    location.href = "/";
+    goNext();
   } catch (e) {
     errEl.textContent = "网络错误：" + e.message;
     btn.disabled = false;
@@ -130,7 +205,9 @@ async function submit() {
 }
 document.getElementById("authSubmit").addEventListener("click", submit);
 document.getElementById("authPass").addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+document.getElementById("authSetup").addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
 setMode("login");
+skipIfLoggedIn();
 </script>
 </body>
 </html>
