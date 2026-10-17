@@ -109,6 +109,53 @@ function json(data, status, cors) {
   });
 }
 
+// ---------- AI 对话限流 ----------
+// 四个计数键，阈值由 KV 免费写额度倒推：每次调用写 4 个键，免费额度 1000 写/天
+// → 全站日上限 300（1200 写）是硬约束，不是拍脑袋。升级套餐后把 AI_GLOBAL_DAY 提到 2000 即可。
+const AI_USER_HOUR = 30;
+const AI_USER_DAY = 100;
+const AI_IP_HOUR = 60;
+const AI_GLOBAL_DAY = 300;
+// 计数是近似限流：KV 最终一致，并发下可能多放 1–2 次。精确限流要 Durable Object，这个量级不值得。
+function ai429(message, code, window, resetAt) {
+  return json({ error: message, code, ...(window ? { window } : {}), resetAt }, 429, true);
+}
+// 返回 null 表示放行；否则返回 429 响应
+async function aiRateCheck(env, username, ip) {
+  const now = Date.now();
+  const p = cnParts(now);
+  const kUH = `aiq:uh:${username}:${p.ymdh}`;
+  const kUD = `aiq:u:${username}:${p.ymd}`;
+  const kIH = `aiq:ip:${ip}:${p.ymdh}`;
+  const kAD = `aiq:all:${p.ymd}`;
+  // 先读后写：任一超限立刻返回，不要为了“记一次”先写
+  const [uh, ud, ih, ad] = await Promise.all([
+    env.MSG_KV.get(kUH), env.MSG_KV.get(kUD), env.MSG_KV.get(kIH), env.MSG_KV.get(kAD)
+  ]);
+  const nUH = parseInt(uh || "0", 10);
+  const nUD = parseInt(ud || "0", 10);
+  const nIH = parseInt(ih || "0", 10);
+  const nAD = parseInt(ad || "0", 10);
+  // 判定顺序：全站日 → 用户日 → 用户小时 → IP 小时。
+  // 用户小时与用户日同时命中时回日档：当天已用完的人不该被告知“20 分钟后再试”，
+  // 否则他白等一轮又撞墙。
+  if (nAD >= AI_GLOBAL_DAY) return ai429("今天全站的额度用完了，明天再来", "global_quota_exceeded", "", p.nextDay);
+  if (nUD >= AI_USER_DAY) return ai429("今天的次数用完了，明天再来", "user_rate_limited", "day", p.nextDay);
+  if (nUH >= AI_USER_HOUR) return ai429("这一小时聊得有点多，歇一会儿再来", "user_rate_limited", "hour", p.nextHour);
+  if (nIH >= AI_IP_HOUR) return ai429("这个网络这一小时聊得有点多，歇一会儿再来", "ip_rate_limited", "hour", p.nextHour);
+  // 放行：计数写入不阻塞响应（写失败就当没记，宁可放过一次，也别让用户白等）
+  return { kUH, kUD, kIH, kAD, nUH, nUD, nIH, nAD };
+}
+function aiRateCommit(env, ctx, s) {
+  const w = [
+    env.MSG_KV.put(s.kUH, String(s.nUH + 1), { expirationTtl: 3600 }),
+    env.MSG_KV.put(s.kUD, String(s.nUD + 1), { expirationTtl: 86400 }),
+    env.MSG_KV.put(s.kIH, String(s.nIH + 1), { expirationTtl: 3600 }),
+    env.MSG_KV.put(s.kAD, String(s.nAD + 1), { expirationTtl: 86400 })
+  ];
+  ctx.waitUntil(Promise.all(w).catch(() => {}));
+}
+
 // ---------- 留言板：一条留言一个 KV 键 ----------
 // 旧实现是 msgs 单键 read-modify-write（get → push → put）：两个并发请求读到同一份数组，
 // 后写的覆盖先写的，必丢数据；change-username 还在同一个键上做第二次 RMW，风险叠加。
@@ -772,17 +819,37 @@ export default {
       // 聊天代理（登录可用；预设模式用站长 Key，个人模式用用户自带 Key）
       if (path === "/api/ai/chat" && request.method === "POST") {
         const auth = await getAuth(request, env);
-        if (!auth) return json({ error: "未登录" }, 401, true);
+        if (!auth) return json({ error: "未登录", code: "unauthorized" }, 401, true);
+        // 限流必须在读 body 之前先判：被挡的请求连解析都不会解析
+        const rl = await aiRateCheck(env, auth.username, clientIP(request));
+        if (rl instanceof Response) return rl;
         try {
           const body = await request.json();
           const messages = body.messages;
-          if (!Array.isArray(messages) || !messages.length) return json({ error: "消息不能为空" }, 400, true);
-          const msgSafe = messages.slice(-20).map(m => ({ role: String(m.role || "user").slice(0, 10), content: String(m.content || "").slice(0, 8000) }));
+          if (!Array.isArray(messages) || !messages.length) return json({ error: "消息不能为空", code: "messages_required" }, 400, true);
+          // 请求体上限（控成本比限流更直接）：
+          //   1) 只保留最后 10 轮（原 20）
+          //   2) 所有 content 字符总数 ≤8000，超出从最旧的消息开始丢
+          //      —— 保留尾部而不是砍尾部：最后一条就是用户这次的问题，砍掉等于对话直接断掉
+          let msgSafe = messages.slice(-10).map(m => ({ role: String(m.role || "user").slice(0, 10), content: String(m.content || "") }));
+          let total = msgSafe.reduce((s, m) => s + m.content.length, 0);
+          while (msgSafe.length > 1 && total > 8000) {
+            total -= msgSafe.shift().content.length;
+          }
+          if (total > 8000) {
+            // 只剩一条还是超，就截这条的尾部内容（保最新、丢开头）
+            msgSafe = [{ ...msgSafe[0], content: msgSafe[0].content.slice(-8000) }];
+          }
+          // max_tokens 默认 800：不传的话上游可能给到 4k，单次成本差好几倍
+          const mt = Number(body.max_tokens);
+          const maxTokens = Number.isFinite(mt) ? Math.min(2000, Math.max(200, Math.round(mt))) : 800;
+          const tp = Number(body.temperature);
+          const temperature = Number.isFinite(tp) ? Math.min(2, Math.max(0, tp)) : 0.7;
           let baseURL, model, apiKey;
           if (body.preset_id) {
             const list = (await env.MSG_KV.get("ai_presets", "json")) || [];
             const p = list.find(x => x.id === body.preset_id);
-            if (!p) return json({ error: "预设模型不存在" }, 404, true);
+            if (!p) return json({ error: "预设模型不存在", code: "preset_not_found" }, 404, true);
             baseURL = p.baseURL; model = p.model; apiKey = p.key;
           } else {
             baseURL = String(body.baseURL || "").trim();
@@ -791,19 +858,21 @@ export default {
             if (!baseURL || !model || !apiKey) return json({ error: "请提供 API 地址、模型和 Key" }, 400, true);
             if (!/^https:\/\//.test(baseURL)) return json({ error: "API 地址必须是 https 链接" }, 400, true);
           }
+          // 计数写入放到后台：请求已经放行，写失败也不该让这次对话失败
+          aiRateCommit(env, ctx, rl);
           const up = await fetch(baseURL.replace(/\/+$/, "") + "/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-            body: JSON.stringify({ model, messages: msgSafe, temperature: typeof body.temperature === "number" ? body.temperature : 0.7, stream: false })
+            body: JSON.stringify({ model, messages: msgSafe, temperature, max_tokens: maxTokens, stream: false })
           });
           const data = await up.json().catch(() => ({}));
           if (!up.ok) {
             const msg = data.error && data.error.message ? data.error.message : JSON.stringify(data).slice(0, 200);
-            return json({ error: `上游错误 ${up.status}: ${msg}` }, 502, true);
+            return json({ error: `上游错误 ${up.status}: ${msg}`, code: "upstream_error" }, 502, true);
           }
           const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
           return json({ ok: true, content }, 200, true);
-        } catch (e) { return json({ error: `代理失败: ${e.message}` }, 500, true); }
+        } catch (e) { return json({ error: `代理失败: ${e.message}`, code: "proxy_failed" }, 500, true); }
       }
       return json({ error: "method not allowed" }, 405, true);
     }
