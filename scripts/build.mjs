@@ -53,7 +53,11 @@ const PAGES = [
 ];
 
 // 白名单：进 dist/ 的其他文件
-const EXTRA = ["_worker.js", "robots.txt", "default.svg", "bh32.jpg", "bh33.jpg", "games.json"];
+const EXTRA = [
+  "_worker.js", "robots.txt", "default.svg", "bh32.jpg", "bh33.jpg", "games.json",
+  // PWA
+  "manifest.webmanifest", "sw.js", "offline.html", "icon-192.png", "icon-512.png"
+];
 
 // 永不进 dist/（白名单之外的一切都进不来，这里只是让构建日志说清楚）
 const EXCLUDED = ["docs/", "scripts/", "_backup/", "_shots/", "dist/", "*.log"];

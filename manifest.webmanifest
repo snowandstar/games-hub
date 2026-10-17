@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "games-hub 游戏中心",
+  "short_name": "games-hub",
+  "description": "9 款游戏浏览器直接开玩：我的世界、Flash 怀旧、2048、扫雷、贪吃蛇",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0918",
+  "theme_color": "#0b0918",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

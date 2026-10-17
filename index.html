@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0b0918">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>游戏中心 · games-hub</title>
 <meta name="description" content="9 款游戏浏览器直接开玩：我的世界 4 个版本、死神VS火影 Flash 怀旧、2048、扫雷、贪吃蛇。最大的 65.9MB，第一次要等一下。">
 <meta property="og:title" content="游戏中心 · games-hub">
@@ -1716,6 +1717,25 @@ ul,ol{ padding: 0; list-style: none; }
   });
 
   window.addEventListener("hashchange", applyHash);
+
+  /* ---------------- PWA：service worker ---------------- */
+  // 只在安全上下文注册（生产 https / 本地 localhost）。
+  // SW 缓存策略见 sw.js：不碰 /api、不缓存带账号数据的页面，断网时只兜三款纯静态小游戏。
+  if ("serviceWorker" in navigator &&
+      (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+    navigator.serviceWorker.register("/sw.js").then(function (reg) {
+      reg.addEventListener("updatefound", function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", function () {
+          // 有旧 SW 在控制页面时，新 SW 装完才提示（首次安装不打扰）
+          if (nw.state === "installed" && navigator.serviceWorker.controller) {
+            toast("站点有更新，刷新页面即可生效", "info");
+          }
+        });
+      });
+    }).catch(function () { /* SW 失败不影响正常使用 */ });
+  }
 
   renderUser();
   syncFavButtons();
