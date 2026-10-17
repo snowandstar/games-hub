@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>扫雷 · games-hub</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f0c29;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px}
+h1{font-size:28px;letter-spacing:2px;margin-bottom:6px}
+.sub{color:#8a92b8;font-size:13px;margin-bottom:16px}
+.sub a{color:#a5b4fc;text-decoration:none}
+.top{margin-bottom:14px;display:flex;gap:18px;font-size:15px;color:#b9c2e0}
+.top b{color:#c7d2fe}
+#board{display:grid;gap:4px;background:#1e1b4b;border-radius:10px;padding:10px;user-select:none}
+.cell{width:34px;height:34px;border-radius:6px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;cursor:pointer}
+.cell:hover{background:rgba(255,255,255,.2)}
+.cell.open{background:rgba(255,255,255,.05);cursor:default}
+.cell.mine{background:#ef4444}
+.cell.flag{background:rgba(240,171,252,.4)}
+.n1{color:#93c5fd}.n2{color:#6ee7b7}.n3{color:#fca5a5}.n4{color:#c4b5fd}.n5{color:#f9a8d4}.n6{color:#7dd3fc}.n7{color:#fff}.n8{color:#fbbf24}
+.btns{margin-top:16px;display:flex;gap:10px}
+button{background:#c7d2fe;color:#1e1b4b;border:0;border-radius:10px;padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer}
+.msg{margin-top:12px;font-size:15px;font-weight:700;min-height:22px}
+.tip{color:#6d759c;font-size:12px;margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<h1>扫雷</h1>
+<div class="sub"><a href="/">← 返回游戏中心</a></div>
+<div class="top"><span>剩余雷：<b id="mines">10</b></span><span>时间：<b id="time">0</b>s</span></div>
+<div id="board"></div>
+<div class="msg" id="msg"></div>
+<div class="btns">
+  <button onclick="start(9,9,10)">初级 9x9</button>
+  <button onclick="start(16,16,40)">中级 16x16</button>
+  <button onclick="start(16,30,99)">高级 30x16</button>
+</div>
+<div class="tip">左键翻开，右键插旗；数字=周围雷数</div>
+<script>
+let R,C,M,grid=[],opened=0,flags=0,over=false,started=false,timer=null,t=0;
+const board=document.getElementById("board");
+function start(r,c,m){R=r;C=c;M=m;grid=Array.from({length:R},()=>Array(C).fill({mine:false,n:0,open:false,flag:false}));opened=0;flags=0;over=false;started=false;t=0;clearInterval(timer);document.getElementById("time").textContent=0;document.getElementById("msg").textContent="";document.getElementById("mines").textContent=M;document.getElementById("board").style.gridTemplateColumns=`repeat(${C},34px)`;render()}
+function plant(ex,ey){const cells=[];for(let i=0;i<R;i++)for(let j=0;j<C;j++)cells.push([i,j]);for(let k=0;k<M;k++){const p=Math.floor(Math.random()*cells.length);const [i,j]=cells.splice(p,1)[0];if(i===ex&&j===ey){k--;continue}grid[i][j].mine=true}for(let i=0;i<R;i++)for(let j=0;j<C;j++){let n=0;for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){if(di===0&&dj===0)continue;const ni=i+di,nj=j+dj;if(ni>=0&&ni<R&&nj>=0&&nj<C&&grid[ni][nj].mine)n++}grid[i][j].n=n}}
+function render(){board.innerHTML="";for(let i=0;i<R;i++)for(let j=0;j<C;j++){const c=grid[i][j],d=document.createElement("div");d.className="cell";if(c.open){d.classList.add("open");if(c.mine){d.classList.add("mine");d.textContent="*"}else if(c.n>0){d.classList.add("n"+c.n);d.textContent=c.n}}else if(c.flag){d.classList.add("flag");d.textContent="⚑"}d.dataset.i=i;d.dataset.j=j;board.appendChild(d)}}
+function open(i,j){if(i<0||i>=R||j<0||j>=C||grid[i][j].open||grid[i][j].flag)return;if(!started){started=true;timer=setInterval(()=>{t++;document.getElementById("time").textContent=t},1000);plant(i,j)}const c=grid[i][j];c.open=true;opened++;if(c.mine){over=true;clearInterval(timer);reveal();document.getElementById("msg").textContent="💥 踩雷了！";return}if(c.n===0){for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)open(i+di,j+dj)}if(opened===R*C-M&&!over){over=true;clearInterval(timer);document.getElementById("msg").textContent="🎉 恭喜通关！";}render()}
+function reveal(){for(let i=0;i<R;i++)for(let j=0;j<C;j++)if(grid[i][j].mine)grid[i][j].open=true;render()}
+board.addEventListener("click",e=>{const d=e.target.closest(".cell");if(!d||over)return;open(+d.dataset.i,+d.dataset.j)});
+board.addEventListener("contextmenu",e=>{e.preventDefault();const d=e.target.closest(".cell");if(!d||over)return;const i=+d.dataset.i,j=+d.dataset.j;if(grid[i][j].open)return;grid[i][j].flag=!grid[i][j].flag;flags+=grid[i][j].flag?1:-1;document.getElementById("mines").textContent=M-flags;render()});
+start(9,9,10);
+</script>
+</body>
+</html>

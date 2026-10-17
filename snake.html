@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贪吃蛇 · games-hub</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f0c29;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px}
+h1{font-size:28px;letter-spacing:2px;margin-bottom:6px}
+.sub{color:#8a92b8;font-size:13px;margin-bottom:16px}
+.sub a{color:#a5b4fc;text-decoration:none}
+.top{margin-bottom:14px;display:flex;gap:18px;font-size:15px;color:#b9c2e0}
+.top b{color:#c7d2fe}
+canvas{background:#1e1b4b;border-radius:12px;display:block}
+.btns{margin-top:16px;display:flex;gap:10px}
+button{background:#c7d2fe;color:#1e1b4b;border:0;border-radius:10px;padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer}
+button.ghost{background:rgba(255,255,255,.1);color:#fff}
+.msg{margin-top:12px;font-size:15px;font-weight:700;min-height:22px;color:#f9a8d4}
+.tip{color:#6d759c;font-size:12px;margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<h1>贪吃蛇</h1>
+<div class="sub"><a href="/">← 返回游戏中心</a></div>
+<div class="top"><span>得分：<b id="score">0</b></span><span>最高：<b id="best">0</b></span></div>
+<canvas id="cv" width="400" height="400"></canvas>
+<div class="msg" id="msg"></div>
+<div class="btns">
+  <button onclick="start()">开始 / 重新开始</button>
+  <button class="ghost" onclick="pause()">暂停 / 继续</button>
+</div>
+<div class="tip">方向键 / WASD 控制方向，吃食物变长</div>
+<script>
+const N=20,SIZE=20,cv=document.getElementById("cv"),ctx=cv.getContext("2d");
+let snake,food,dir,nextDir,running=false,paused=false,score=0,best=parseInt(localStorage.getItem("gsnakebest")||0),loop=null,speed=130;
+document.getElementById("best").textContent=best;
+function start(){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};nextDir={x:1,y:0};score=0;running=true;paused=false;document.getElementById("score").textContent=0;document.getElementById("msg").textContent="";clearInterval(loop);placeFood();draw();loop=setInterval(tick,speed)}
+function pause(){if(!running)return;paused=!paused;if(!paused)loop=setInterval(tick,speed);else clearInterval(loop)}
+function placeFood(){do{food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)}}while(snake.some(s=>s.x===food.x&&s.y===food.y))}
+function tick(){dir=nextDir;const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+if(head.x<0||head.x>=N||head.y<0||head.y>=N||snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver();return}
+snake.unshift(head);
+if(head.x===food.x&&head.y===food.y){score++;document.getElementById("score").textContent=score;if(score>best){best=score;localStorage.setItem("gsnakebest",best);document.getElementById("best").textContent=best}placeFood();if(speed>70)speed-=2}else snake.pop();
+draw()}
+function gameOver(){clearInterval(loop);running=false;document.getElementById("msg").textContent="游戏结束！得分 "+score;draw()}
+function draw(){ctx.clearRect(0,0,400,400);ctx.fillStyle="rgba(255,255,255,.07)";for(let i=0;i<N;i++)for(let j=0;j<N;j++)if((i+j)%2===0)ctx.fillRect(i*SIZE,j*SIZE,SIZE,SIZE);
+ctx.fillStyle="#fbbf24";ctx.beginPath();ctx.arc(food.x*SIZE+SIZE/2,food.y*SIZE+SIZE/2,SIZE/2-3,0,Math.PI*2);ctx.fill();
+snake.forEach((s,i)=>{ctx.fillStyle=i===0?"#a5b4fc":"#6366f1";ctx.fillRect(s.x*SIZE+1,s.y*SIZE+1,SIZE-2,SIZE-2)})}
+document.addEventListener("keydown",e=>{const k={ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1}}[e.key];
+if(k&&running&&!paused){e.preventDefault();if(dir.x+k.x===0&&dir.y+k.y===0)return;nextDir=k}
+if(e.key===" "){e.preventDefault();if(running)pause()}});
+start();
+</script>
+</body>
+</html>

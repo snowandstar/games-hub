@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>加载游戏 | 游戏中心</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23302b63'/%3E%3Cpath d='M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0' fill='none' stroke='%23e0e7ff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 30h6M52 30h6M26 40h-8v8M30 44h-8' stroke='%23c7d2fe' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='44' cy='40' r='3' fill='%23f0abfc'/%3E%3Ccircle cx='50' cy='44' r='2.2' fill='%2393c5fd'/%3E%3C/svg%3E">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg:#12121a; --card:#1c1c2b; --line:rgba(255,255,255,.09);
+  --txt:#fff; --sub:#b9c2e0; --dim:#8a92b8; --accent:#c7d2fe; --accent2:#a5b4fc;
+}
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(167,139,250,.14), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--txt); min-height: 100vh; display: flex; flex-direction: column;
+}
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 30;
+  flex-wrap: wrap;
+}
+.back {
+  background: rgba(255,255,255,.1); border: none; color: var(--txt);
+  padding: 7px 16px; border-radius: 9px; cursor: pointer; font-size: 14px; transition: .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.back:hover { background: rgba(255,255,255,.2); }
+.title-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+#gameTitle { font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-tag {
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; flex: none;
+  background: rgba(240,171,252,.15); color: #f0abfc; border: 1px solid rgba(240,171,252,.35);
+}
+.type-tag.h5 { background: rgba(147,197,253,.15); color: #93c5fd; border-color: rgba(147,197,253,.35); }
+.tb-actions { display: flex; gap: 8px; flex: none; }
+.tb-btn {
+  background: rgba(255,255,255,.1); border: 1px solid var(--line); color: var(--txt);
+  padding: 7px 14px; border-radius: 9px; cursor: pointer; font-size: 13px; transition: .15s;
+}
+.tb-btn:hover { background: rgba(255,255,255,.18); }
+.stage {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 20px 16px 10px;
+}
+#container { width: 100%; max-width: 1200px; }
+#flashBox {
+  width: 100%; background: #000;
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0,0,0,.65);
+  aspect-ratio: 4/3;
+  position: relative;
+  display: none;
+}
+#flashBox ruffle-player { width: 100%; height: 100%; display: block; }
+#flashBox iframe { width: 100%; height: 100%; border: 0; display: block; }
+.state-box { text-align: center; color: var(--sub); padding: 60px 20px; font-size: 15px; }
+.state-box .spinner {
+  width: 34px; height: 34px; margin: 0 auto 16px; border-radius: 50%;
+  border: 3px solid rgba(199,212,254,.2); border-top-color: var(--accent);
+  animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.state-box .tip { color: var(--dim); font-size: 12.5px; margin-top: 12px; line-height: 1.8; }
+.state-box.error { color: #fca5a5; }
+.state-box .btn {
+  margin-top: 18px; display: inline-block; border: 1px solid var(--line);
+  background: rgba(255,255,255,.08); color: var(--txt);
+  padding: 9px 26px; border-radius: 10px; cursor: pointer; font-size: 14px;
+}
+.state-box .btn:hover { background: rgba(255,255,255,.15); }
+.hint { text-align: center; color: var(--dim); font-size: 12.5px; padding: 12px 16px 26px; line-height: 1.9; }
+.kbd {
+  display: inline-block; padding: 1px 7px; margin: 0 2px;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  background: rgba(255,255,255,.06); font-size: 11px; color: var(--accent2);
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back" onclick="goBack()">← 返回</button>
+  <div class="title-wrap">
+    <span id="gameTitle">加载中...</span>
+    <span id="typeTag" class="type-tag" style="display:none"></span>
+  </div>
+  <div class="tb-actions">
+    <button class="tb-btn" id="fullBtn" style="display:none" onclick="toggleFull()">⛶ 全屏</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div id="container">
+    <div id="loading" class="state-box">
+      <div class="spinner"></div>
+      <div id="loadingMsg">正在加载游戏...</div>
+      <div class="tip" id="loadingTip" style="display:none"></div>
+    </div>
+    <div id="errorBox" class="state-box error" style="display:none"></div>
+    <div id="flashBox"></div>
+  </div>
+</div>
+<div class="hint" id="hint" style="display:none"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.6.0/ruffle.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const id = params.get("id") || "";
+const API_BASE = "/api";
+let curGame = null;
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function fmtSize(mb) {
+  if (mb == null) return "";
+  return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
+}
+function showError(msg, retry) {
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("flashBox").style.display = "none";
+  const eb = document.getElementById("errorBox");
+  eb.style.display = "block";
+  eb.innerHTML = `<div>${esc(msg)}</div>${retry ? `<button class="btn" onclick="boot()">重试</button>` : `<a class="btn" style="text-decoration:none" href="/">返回首页</a>`}`;
+}
+function showLoading(msg, tip) {
+  document.getElementById("errorBox").style.display = "none";
+  document.getElementById("flashBox").style.display = "none";
+  const L = document.getElementById("loading");
+  L.style.display = "block";
+  document.getElementById("loadingMsg").textContent = msg || "正在加载游戏...";
+  const t = document.getElementById("loadingTip");
+  if (tip) { t.style.display = "block"; t.innerHTML = tip; } else { t.style.display = "none"; }
+}
+function boot() {
+  if (!id) { showError("缺少游戏参数", false); return; }
+  showLoading("正在读取游戏信息...");
+  fetch(API_BASE + "/games")
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(games => {
+      const game = (games || []).find(g => g.id === id);
+      if (!game) { showError("未找到该游戏", false); return; }
+      curGame = game;
+      document.getElementById("gameTitle").textContent = game.name;
+      document.title = game.name + " | 游戏中心";
+      const tag = document.getElementById("typeTag");
+      tag.style.display = "inline-block";
+      tag.textContent = game.type === "flash" ? "Flash 怀旧" : "H5";
+      tag.className = "type-tag" + (game.type === "h5" ? " h5" : "");
+      const full = document.getElementById("fullBtn");
+      full.style.display = "inline-block";
+      full.textContent = document.fullscreenElement ? "退出全屏" : "全屏";
+      const hint = document.getElementById("hint");
+      if (game.type === "flash") {
+        hint.style.display = "block";
+        hint.innerHTML = `提示：Flash 游戏由 Ruffle 模拟器运行，使用 <span class="kbd">W A S D</span> 或 <span class="kbd">方向键</span> 移动、<span class="kbd">J K L U I O</span> 攻击（具体按键以游戏内为准）。若无法启动请按 <span class="kbd">Ctrl+F5</span> 强制刷新。`;
+        const tip = game.size > 25
+          ? `游戏体积约 <b>${fmtSize(game.size)}</b>，首次加载需要下载全部数据，请耐心等待 1-3 分钟。`
+          : "";
+        showLoading("正在加载 Flash 游戏，请稍候...", tip);
+        const fc = document.getElementById("flashBox");
+        fc.innerHTML = "";
+        const url = API_BASE + "/swf?id=" + encodeURIComponent(game.id);
+        fc.style.display = "block";
+        const player = (window.RufflePlayer && window.RufflePlayer.newest())
+          ? window.RufflePlayer.newest().createPlayer()
+          : document.createElement("ruffle-player");
+        player.src = url;
+        // Ruffle 加载/出错事件
+        player.addEventListener("loadedmetadata", () => {
+          document.getElementById("loading").style.display = "none";
+        });
+        player.addEventListener("error", e => {
+          console.error("Ruffle error:", e);
+          showError("游戏加载失败，可能是文件较大或模拟器不兼容。可刷新重试。", true);
+        });
+        // 兜底：加载区隐藏（无论成功与否，避免一直转圈）
+        fc.appendChild(player);
+        // 若 12 秒仍未触发任何事件，先隐藏加载转圈（游戏可能已开始）
+        setTimeout(() => { document.getElementById("loading").style.display = "none"; }, 12000);
+      } else if (game.type === "h5") {
+        hint.style.display = "block";
+        hint.innerHTML = `提示：H5 游戏为网页版，若卡在加载请刷新页面。`;
+        showLoading("正在加载 H5 游戏...");
+        const fc = document.getElementById("flashBox");
+        fc.style.display = "block";
+        fc.innerHTML = `<iframe src="${esc(game.url || game.swf || "")}" allow="fullscreen" allowfullscreen></iframe>`;
+        document.getElementById("loading").style.display = "none";
+      } else {
+        showError("未知的游戏类型", false);
+      }
+    })
+    .catch(e => showError("配置加载失败：" + e.message, true));
+}
+function toggleFull() {
+  const box = document.getElementById("flashBox");
+  const btn = document.getElementById("fullBtn");
+  if (!document.fullscreenElement) {
+    box.requestFullscreen && box.requestFullscreen().then(() => {
+      btn.textContent = "退出全屏";
+    }).catch(() => {});
+  } else {
+    document.exitFullscreen && document.exitFullscreen();
+    btn.textContent = "全屏";
+  }
+}
+document.addEventListener("fullscreenchange", () => {
+  const btn = document.getElementById("fullBtn");
+  if (btn) btn.textContent = document.fullscreenElement ? "退出全屏" : "全屏";
+});
+function goBack() {
+  if (history.length > 1) history.back();
+  else location.href = "/";
+}
+boot();
+</script>
+</body>
+</html>

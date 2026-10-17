@@ -1,0 +1,71 @@
+[
+  {
+    "id": "minecraft-188",
+    "name": "我的世界 1.8.8",
+    "type": "h5",
+    "size": 14.4,
+    "icon": "/default.svg",
+    "url": "/minecraft.html"
+  },
+  {
+    "id": "minecraft-1122",
+    "name": "我的世界 1.12.2",
+    "type": "h5",
+    "size": 19.2,
+    "icon": "/default.svg",
+    "url": "/minecraft-1122.html"
+  },
+  {
+    "id": "minecraft-125",
+    "name": "我的世界 1.2.5",
+    "type": "h5",
+    "size": 6,
+    "icon": "/default.svg",
+    "url": "/minecraft-125.html"
+  },
+  {
+    "id": "minecraft-classic",
+    "name": "我的世界 Classic 0.30",
+    "type": "h5",
+    "size": 3.6,
+    "icon": "/default.svg",
+    "url": "/minecraft-classic.html"
+  },
+  {
+    "id": "bleshui-vs-huoYing-3.2",
+    "name": "死神VS火影 3.2",
+    "type": "flash",
+    "size": 58.9,
+    "icon": "/bh32.jpg",
+    "swf": "/swf/bh32.swf"
+  },
+  {
+    "id": "bleshui-vs-huoYing-3.3",
+    "name": "死神VS火影 3.3",
+    "type": "flash",
+    "size": 65.9,
+    "icon": "/bh33.jpg",
+    "swf": "/swf/bh33.swf"
+  },
+  {
+    "id": "game2048",
+    "name": "2048",
+    "type": "h5",
+    "icon": "/default.svg",
+    "url": "/game2048.html"
+  },
+  {
+    "id": "minesweeper",
+    "name": "扫雷",
+    "type": "h5",
+    "icon": "/default.svg",
+    "url": "/minesweeper.html"
+  },
+  {
+    "id": "snake",
+    "name": "贪吃蛇",
+    "type": "h5",
+    "icon": "/default.svg",
+    "url": "/snake.html"
+  }
+]

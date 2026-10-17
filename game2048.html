@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2048 · games-hub</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#0f0c29;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:30px 16px}
+h1{font-size:28px;letter-spacing:2px;margin-bottom:6px}
+.sub{color:#8a92b8;font-size:13px;margin-bottom:18px}
+.score{margin-bottom:14px;font-size:15px;color:#b9c2e0}
+.score b{color:#c7d2fe;font-size:20px}
+#board{background:#1e1b4b;border-radius:12px;padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(92vw,400px);aspect-ratio:1}
+.cell{background:rgba(255,255,255,.06);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;transition:.12s}
+.c2{background:#4338ca;color:#e0e7ff}.c4{background:#3730a3;color:#e0e7ff}.c8{background:#7c3aed;color:#fff}
+.c16{background:#a855f7;color:#fff}.c32{background:#d946ef;color:#fff}.c64{background:#ec4899;color:#fff}
+.c128{background:#f59e0b;color:#1e1b4b}.c256{background:#f97316;color:#1e1b4b}.c512{background:#ef4444;color:#fff}
+.c1024{background:#dc2626;color:#fff}.c2048{background:#fbbf24;color:#1e1b4b}
+.cell.big{font-size:24px}
+.btns{margin-top:16px;display:flex;gap:10px}
+button{background:#c7d2fe;color:#1e1b4b;border:0;border-radius:10px;padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer}
+button.ghost{background:rgba(255,255,255,.1);color:#fff}
+.tip{color:#6d759c;font-size:12px;margin-top:14px;text-align:center}
+a{color:#a5b4fc;text-decoration:none}
+</style>
+</head>
+<body>
+<h1>2048</h1>
+<div class="sub"><a href="/">← 返回游戏中心</a></div>
+<div class="score">分数：<b id="score">0</b>　最高：<b id="best">0</b></div>
+<div id="board"></div>
+<div class="btns">
+  <button onclick="move('left')">←</button><button onclick="move('up')">↑</button>
+  <button onclick="move('down')">↓</button><button onclick="move('right')">→</button>
+</div>
+<div class="btns"><button class="ghost" onclick="restart()">重新开始</button></div>
+<div class="tip">键盘方向键 / WASD 移动，相同数字合并</div>
+<script>
+let g=[],score=0,best=parseInt(localStorage.getItem("g2048best")||0);
+const board=document.getElementById("board");
+function init(){g=Array.from({length:4},()=>Array(4).fill(0));score=0;spawn();spawn();render();updateScore()}
+function spawn(){const empty=[];g.forEach((r,i)=>r.forEach((v,j)=>{if(!v)empty.push([i,j])}));if(empty.length){const [i,j]=empty[Math.floor(Math.random()*empty.length)];g[i][j]=Math.random()<.9?2:4}}
+function slide(row){let a=row.filter(v=>v);for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];a.splice(i+1,1)}}while(a.length<4)a.push(0);return a}
+function move(dir){let old=JSON.stringify(g);let ng=[];for(let i=0;i<4;i++){let col=g.map(r=>r[i]);if(dir==='left')ng.push(slide(g[i]));else if(dir==='right')ng.push(slide(g[i].slice().reverse()).reverse());else if(dir==='up')ng.push([])}if(dir==='up'||dir==='down'){for(let c=0;c<4;c++){let col=[];for(let r=0;r<4;r++)col.push(g[r][c]);let s=dir==='up'?slide(col):slide(col.reverse()).reverse();for(let r=0;r<4;r++)g[r][c]=s[r]}}else{g=ng}if(JSON.stringify(g)!==old){spawn();render();updateScore();if(score>best){best=score;localStorage.setItem("g2048best",best)}}}
+function render(){board.innerHTML="";g.flat().forEach(v=>{const d=document.createElement("div");d.className="cell c"+(v||"");if(v>512)d.classList.add("big");d.textContent=v||"";board.appendChild(d)})}
+function updateScore(){document.getElementById("score").textContent=score;document.getElementById("best").textContent=best}
+function restart(){init()}
+document.addEventListener("keydown",e=>{const k={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',a:'left',d:'right',w:'up',s:'down'}[e.key];if(k){e.preventDefault();move(k)}});
+document.addEventListener('touchstart',t=>{const x=t.touches[0].clientX,y=t.touches[0].clientY;window._tx=x;window._ty=y},{passive:true});
+document.addEventListener('touchend',t=>{const dx=t.changedTouches[0].clientX-window._tx,dy=t.changedTouches[0].clientY-window._ty;if(Math.abs(dx)>30||Math.abs(dy)>30){move(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'))}},{passive:true});
+init();
+</script>
+</body>
+</html>

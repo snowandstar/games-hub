@@ -1,0 +1,16 @@
+# 构建产物（由 scripts/build.mjs 生成，不提交）
+dist/
+
+# 依赖与日志
+node_modules/
+*.log
+
+# 历史备份与截图（P1-10 要求清理，不进版本库）
+_backup/
+_shots/
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

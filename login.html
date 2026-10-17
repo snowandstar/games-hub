@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · games-hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23302b63'/%3E%3Cpath d='M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0' fill='none' stroke='%23e0e7ff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg1:#0f0c29; --bg2:#302b63; --bg3:#24243e;
+  --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.1);
+  --txt:#fff; --sub:#b9c2e0; --dim:#8a92b8;
+  --accent:#c7d2fe; --accent2:#a5b4fc;
+}
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(167,139,250,.16), transparent 60%),
+    radial-gradient(900px 460px at -10% 20%, rgba(147,197,253,.12), transparent 60%),
+    linear-gradient(135deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+  background-attachment: fixed;
+  color: var(--txt); min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.login-card {
+  width: min(94vw, 400px);
+  background: rgba(15,12,41,.82); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 22px; padding: 34px 30px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.5);
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.brand svg { width: 34px; height: 34px; flex-shrink: 0; }
+.brand .bn { font-size: 21px; font-weight: 800; letter-spacing: 1px; }
+.sub { color: var(--dim); font-size: 13px; margin-bottom: 26px; }
+.auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+.auth-tab {
+  flex: 1; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--sub);
+  padding: 9px 0; border-radius: 10px; font-size: 14px; cursor: pointer; transition: .15s;
+}
+.auth-tab:hover { color: var(--txt); border-color: var(--accent2); }
+.auth-tab.on { background: var(--accent); color: #1e1b4b; border-color: var(--accent); font-weight: 700; }
+.field {
+  width: 100%; background: rgba(0,0,0,.35); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 11px; padding: 12px 14px; font-size: 14.5px; outline: none; margin-bottom: 12px;
+}
+.field:focus { border-color: var(--accent2); }
+.err { color: #fca5a5; font-size: 12.5px; min-height: 18px; margin: 2px 0 8px; }
+.btn {
+  width: 100%; border: 0; cursor: pointer; border-radius: 11px;
+  background: var(--accent); color: #1e1b4b; font-size: 15px; font-weight: 700;
+  padding: 12px 0; transition: .15s;
+}
+.btn:hover { background: #dbe3ff; }
+.btn:disabled { opacity: .55; cursor: wait; }
+.tip { text-align: center; font-size: 12px; color: var(--dim); margin-top: 16px; line-height: 1.7; }
+.tip a { color: var(--accent2); text-decoration: none; }
+::selection { background: rgba(165,180,252,.35); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: rgba(165,180,252,.35) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: rgba(165,180,252,.3); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/></svg>
+    <span class="bn">games-hub</span>
+  </div>
+  <div class="sub">登录后进入游戏中心、AI 助手、工具箱、影视音乐和留言板</div>
+  <div class="auth-tabs">
+    <button class="auth-tab on" id="tabLogin" type="button" onclick="setMode('login')">登录</button>
+    <button class="auth-tab" id="tabReg" type="button" onclick="setMode('register')">注册</button>
+  </div>
+  <input class="field" type="text" id="authUser" placeholder="用户名（2-20 位字母/数字/中文）" autocomplete="username">
+  <input class="field" type="password" id="authPass" placeholder="密码（至少 6 位）" autocomplete="current-password">
+  <div class="err" id="authErr"></div>
+  <button class="btn" id="authSubmit" type="button">登录</button>
+  <div class="tip" id="authTip" style="display:none">第一个注册的账号自动成为管理员</div>
+</div>
+
+<script>
+let mode = "login";
+const errEl = document.getElementById("authErr");
+function setMode(m) {
+  mode = m;
+  document.getElementById("tabLogin").classList.toggle("on", m === "login");
+  document.getElementById("tabReg").classList.toggle("on", m === "register");
+  document.getElementById("authSubmit").textContent = m === "login" ? "登录" : "注册";
+  document.getElementById("authTip").style.display = m === "register" ? "" : "none";
+  errEl.textContent = "";
+}
+async function submit() {
+  const u = document.getElementById("authUser").value.trim();
+  const p = document.getElementById("authPass").value;
+  errEl.textContent = "";
+  if (!u || !p) { errEl.textContent = "请填写用户名和密码"; return; }
+  const btn = document.getElementById("authSubmit");
+  btn.disabled = true;
+  btn.textContent = "请稍候…";
+  try {
+    const res = await fetch("/api/auth/" + (mode === "login" ? "login" : "register"), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await res.json();
+    if (!res.ok) { errEl.textContent = d.error || "操作失败"; btn.disabled = false; btn.textContent = mode === "login" ? "登录" : "注册"; return; }
+    if (mode === "register") {
+      const res2 = await fetch("/api/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p })
+      });
+      const d2 = await res2.json();
+      if (d2.ok) {
+        localStorage.setItem("ghub_token", d2.token);
+        localStorage.setItem("ghub_user", JSON.stringify({ username: d2.username, admin: d2.admin }));
+      }
+      if (d.admin) alert("注册成功！你是第一个注册的账号，已自动成为管理员。");
+    } else {
+      localStorage.setItem("ghub_token", d.token);
+      localStorage.setItem("ghub_user", JSON.stringify({ username: d.username, admin: d.admin }));
+    }
+    location.href = "/";
+  } catch (e) {
+    errEl.textContent = "网络错误：" + e.message;
+    btn.disabled = false;
+    btn.textContent = mode === "login" ? "登录" : "注册";
+  }
+}
+document.getElementById("authSubmit").addEventListener("click", submit);
+document.getElementById("authPass").addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+setMode("login");
+</script>
+</body>
+</html>

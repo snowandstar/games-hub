@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>账号设置 · games-hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23302b63'/%3E%3Cpath d='M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0' fill='none' stroke='%23e0e7ff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg1:#0f0c29; --bg2:#302b63; --bg3:#24243e;
+  --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.1);
+  --txt:#fff; --sub:#b9c2e0; --dim:#8a92b8;
+  --accent:#c7d2fe; --accent2:#a5b4fc;
+}
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(167,139,250,.16), transparent 60%),
+    radial-gradient(900px 460px at -10% 20%, rgba(147,197,253,.12), transparent 60%),
+    linear-gradient(135deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+  background-attachment: fixed;
+  color: var(--txt); min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.card {
+  width: min(94vw, 520px);
+  background: rgba(15,12,41,.84); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 22px; padding: 32px 30px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.5);
+}
+.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.top .tt { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+.top a { color: var(--accent2); font-size: 13px; text-decoration: none; }
+.top a:hover { text-decoration: underline; }
+.head { display: flex; align-items: center; gap: 16px; margin-bottom: 26px; }
+.avatar-big {
+  width: 66px; height: 66px; flex-shrink: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 34px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+}
+.uname { font-size: 19px; font-weight: 800; }
+.utag { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.utag b { color: var(--accent); }
+.sec { margin-bottom: 26px; }
+.sec h3 { font-size: 14.5px; font-weight: 700; margin-bottom: 12px; color: var(--sub); letter-spacing: .5px; }
+.field {
+  width: 100%; background: rgba(0,0,0,.35); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 11px; padding: 11px 14px; font-size: 14px; outline: none; margin-bottom: 10px;
+}
+.field:focus { border-color: var(--accent2); }
+.btn {
+  border: 0; cursor: pointer; border-radius: 10px;
+  background: var(--accent); color: #1e1b4b; font-size: 13.5px; font-weight: 700;
+  padding: 10px 24px; transition: .15s;
+}
+.btn:hover { background: #dbe3ff; }
+.btn:disabled { opacity: .55; cursor: wait; }
+.btn.ghost { background: rgba(255,255,255,.08); color: var(--txt); border: 1px solid var(--line); }
+.btn.ghost:hover { background: rgba(255,255,255,.14); }
+.err { color: #fca5a5; font-size: 12.5px; min-height: 16px; margin-bottom: 8px; }
+.okmsg { color: #86efac; font-size: 12.5px; min-height: 16px; margin-bottom: 8px; }
+.av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-bottom: 14px; }
+.av-item {
+  aspect-ratio: 1; border: 1px solid var(--line); background: rgba(255,255,255,.06);
+  border-radius: 12px; font-size: 22px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: .15s;
+}
+.av-item:hover { border-color: var(--accent2); background: rgba(255,255,255,.12); }
+.av-item.on { border-color: var(--accent); background: rgba(199,210,254,.25); box-shadow: 0 0 0 2px rgba(199,210,254,.35); }
+.row-btn { display: flex; gap: 10px; align-items: center; }
+@media (max-width: 560px) {
+  .av-grid { grid-template-columns: repeat(4, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <span class="tt">账号设置</span>
+    <a href="/">← 返回主页</a>
+  </div>
+  <div class="head">
+    <div class="avatar-big" id="avatarBig">🎮</div>
+    <div>
+      <div class="uname" id="curName">…</div>
+      <div class="utag" id="curTag">加载中…</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>选择头像</h3>
+    <div class="av-grid" id="avGrid"></div>
+    <div class="okmsg" id="avMsg"></div>
+    <div class="row-btn"><button class="btn" id="avSave">保存头像</button></div>
+  </div>
+
+  <div class="sec">
+    <h3>修改用户名</h3>
+    <input class="field" id="newUser" placeholder="新用户名（2-20 位字母/数字/中文）" autocomplete="username">
+    <div class="err" id="unErr"></div>
+    <div class="okmsg" id="unMsg"></div>
+    <div class="row-btn"><button class="btn" id="unSave">保存用户名</button></div>
+  </div>
+
+  <div class="sec">
+    <h3>修改密码</h3>
+    <input class="field" type="password" id="oldPass" placeholder="旧密码" autocomplete="current-password">
+    <input class="field" type="password" id="newPass" placeholder="新密码（至少 6 位）" autocomplete="new-password">
+    <div class="err" id="pwErr"></div>
+    <div class="okmsg" id="pwMsg"></div>
+    <div class="row-btn"><button class="btn" id="pwSave">保存密码</button></div>
+  </div>
+
+  <div class="sec" id="adminSec" style="display:none; margin-bottom:20px;">
+    <h3>管理员</h3>
+    <div class="row-btn">
+      <a class="btn" style="text-decoration:none;" href="/ai-admin">管理 AI 预设模型</a>
+    </div>
+  </div>
+
+  <div class="sec" style="margin-bottom:0">
+    <div class="row-btn">
+      <button class="btn ghost" id="logoutBtn">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const AVATARS = ["🎮", "🕹️", "👾", "🚀", "⭐", "🔥", "🎧", "🏆", "💎", "🐱", "🐶", "🦊", "🐼", "🌈", "👑", "🤖"];
+const TOKEN_KEY = "ghub_token";
+const USER_KEY = "ghub_user";
+let me = null;
+let selAvatar = "";
+
+function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+function getUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (e) { return null; } }
+function saveUser(u) { localStorage.setItem(USER_KEY, JSON.stringify(u)); }
+
+function renderAvatars() {
+  const grid = document.getElementById("avGrid");
+  grid.innerHTML = AVATARS.map(a =>
+    `<div class="av-item${a === selAvatar ? " on" : ""}" data-a="${a}" onclick="pickAvatar('${a}')">${a}</div>`
+  ).join("");
+}
+function pickAvatar(a) {
+  selAvatar = a;
+  document.getElementById("avatarBig").textContent = a;
+  renderAvatars();
+}
+function setErr(id, text) { document.getElementById(id).textContent = text; }
+function setOk(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  setTimeout(() => { el.textContent = ""; }, 4000);
+}
+
+async function init() {
+  me = getUser();
+  if (!me || !me.username) { location.href = "/login.html"; return; }
+  document.getElementById("curName").textContent = me.username + (me.admin ? "（管理员）" : "");
+  document.getElementById("curTag").textContent = "点击左侧头像可更换，历史留言同步更新";
+  document.getElementById("adminSec").style.display = me.admin ? "block" : "none";
+  selAvatar = me.avatar || "🎮";
+  document.getElementById("avatarBig").textContent = selAvatar;
+  renderAvatars();
+}
+
+document.getElementById("avSave").addEventListener("click", async () => {
+  const btn = document.getElementById("avSave");
+  btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/auth/update-avatar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + getToken() },
+      body: JSON.stringify({ avatar: selAvatar })
+    });
+    const d = await res.json();
+    if (!res.ok) { setErr("avMsg", d.error || "保存失败"); }
+    else {
+      me.avatar = selAvatar;
+      saveUser(me);
+      setOk("avMsg", "头像已保存 ✓");
+    }
+  } catch (e) { setErr("avMsg", "网络错误：" + e.message); }
+  btn.disabled = false; btn.textContent = "保存头像";
+});
+
+document.getElementById("unSave").addEventListener("click", async () => {
+  const nn = document.getElementById("newUser").value.trim();
+  setErr("unErr", "");
+  if (!nn) { setErr("unErr", "请输入新用户名"); return; }
+  const btn = document.getElementById("unSave");
+  btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/auth/change-username", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + getToken() },
+      body: JSON.stringify({ new_username: nn })
+    });
+    const d = await res.json();
+    if (!res.ok) { setErr("unErr", d.error || "保存失败"); }
+    else {
+      localStorage.setItem(TOKEN_KEY, d.token);
+      saveUser({ username: d.username, admin: d.admin, avatar: d.avatar });
+      document.getElementById("curName").textContent = d.username + (d.admin ? "（管理员）" : "");
+      document.getElementById("newUser").value = "";
+      setOk("unMsg", "用户名已改为 " + d.username + " ✓（历史留言已同步）");
+    }
+  } catch (e) { setErr("unErr", "网络错误：" + e.message); }
+  btn.disabled = false; btn.textContent = "保存用户名";
+});
+
+document.getElementById("pwSave").addEventListener("click", async () => {
+  const oldP = document.getElementById("oldPass").value;
+  const newP = document.getElementById("newPass").value;
+  setErr("pwErr", "");
+  if (!oldP || !newP) { setErr("pwErr", "请填写旧密码和新密码"); return; }
+  const btn = document.getElementById("pwSave");
+  btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + getToken() },
+      body: JSON.stringify({ old_password: oldP, new_password: newP })
+    });
+    const d = await res.json();
+    if (!res.ok) { setErr("pwErr", d.error || "保存失败"); }
+    else {
+      document.getElementById("oldPass").value = "";
+      document.getElementById("newPass").value = "";
+      setOk("pwMsg", "密码已修改 ✓");
+    }
+  } catch (e) { setErr("pwErr", "网络错误：" + e.message); }
+  btn.disabled = false; btn.textContent = "保存密码";
+});
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  const t = getToken();
+  if (t) fetch("/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(() => { });
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  location.href = "/login.html";
+});
+
+init();
+</script>
+</body>
+</html>
