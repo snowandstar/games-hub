@@ -395,9 +395,20 @@ export default {
       if (await env.MSG_KV.get("user:" + username)) {
         return json({ error: "用户名已被注册" }, 409);
       }
-      // 第一个注册的账号自动成为管理员
-      const listed = await env.MSG_KV.list({ prefix: "user:" });
-      const isAdmin = listed.keys.length === 0;
+      // 管理员由 setup_code 决定，不再是“第一个注册的账号自动成为管理员”。
+      // 旧逻辑用 KV.list({prefix:"user:"}).keys.length === 0 判首注册者，两个问题：
+      //   1) 任何人只要在站长之前注册就永久拿到 admin（抢注）；
+      //   2) 每次注册都扫一遍全表（KV list 有游标开销，用户多了会翻页）。
+      // 未配置 ADMIN_SETUP_CODE 时一律 admin:false（安全默认：宁可没有管理员，也不送管理员）。
+      // 存量 user: 记录里已有的 admin:true 不受影响（本接口只在新建时决定）。
+      const setup = String(body && body.setup_code || "");
+      if (setup && !env.ADMIN_SETUP_CODE) {
+        return json({ error: "本站未开启管理员自助注册", code: "invalid_setup_code" }, 400);
+      }
+      if (setup && !constEq(setup, env.ADMIN_SETUP_CODE)) {
+        return json({ error: "管理员邀请码不正确", code: "invalid_setup_code" }, 400);
+      }
+      const isAdmin = !!env.ADMIN_SETUP_CODE && constEq(setup, env.ADMIN_SETUP_CODE);
       const salt = randHex(16);
       const hash = await hashPassword(password, salt);
       await env.MSG_KV.put("user:" + username, JSON.stringify({ salt, hash, admin: isAdmin, created: Date.now() }));
