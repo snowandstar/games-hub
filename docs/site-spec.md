@@ -177,7 +177,7 @@
 
 | # | 方法 | 路径 | 入参（字段:类型:必填） | 出参 | 鉴权 | 错误码 | 变化 |
 |---|---|---|---|---|---|---|---|
-| 1 | GET | `/api/games` | 无 | `[{ id:string, name:string, type:"h5"\|"flash", size?:number(MB), icon:string, url?:string, swf?:string }]` | 无 | 500 `data_unavailable` | **变**：数据源改读 `games.json`（内存缓存 + 预序列化 + `Cache-Control: public, max-age=60`），不再内嵌数组 |
+| 1 | GET | `/api/games` | 无 | `[{ id:string, name:string, type:"h5"\|"flash", size?:number(**MiB**), icon:string, url?:string, swf?:string }]` | 无 | 500 `data_unavailable` | **变**：数据源改读 `games.json`（内存缓存 + 预序列化 + `Cache-Control: public, max-age=60`），不再内嵌数组 |
 | 2 | GET | `/api/swf?id=<gameId>` | `id:string:必填` | `application/x-shockwave-flash` 二进制 | **登录态**（页面门禁已覆盖，API 层不再单独加 Referer/限流） | 404 `game_not_found` / 404 `asset_not_found` / 500 `gh_token_missing` / 502 `upstream_error` / 405 `method_not_allowed` | 不变（原计划的 Referer 校验与 IP 限流**撤销**，见 6.2 末尾） |
 | 3 | POST | `/api/auth/register` | `username:string:必填`(2–20 位 `[\w\u4e00-\u9fa5]`)、`password:string:必填`(6–64)、`setup_code?:string` | `{ ok:true, admin:boolean }` | 无 | 400 `invalid_username` / 400 `invalid_password` / 409 `username_taken` / 429 `too_many_attempts` | **变**：首个注册者不再自动 admin，须 `setup_code`（6.6） |
 | 4 | POST | `/api/auth/login` | `username:string:必填`、`password:string:必填` | `{ ok:true, token:string, username:string, admin:boolean, avatar:string }` + `Set-Cookie: ghub_gate`、`ghub_token` | 无 | 401 `bad_credentials` / 429 `too_many_attempts` | **变**：下发 HMAC 门禁 cookie；Cookie 加 `HttpOnly; Secure`；补 `avatar` |
@@ -188,7 +188,7 @@
 | 9 | POST | `/api/auth/update-avatar` | `avatar:string:必填`（16 个预设 emoji 之一） | `{ ok:true, avatar:string }` | Bearer | 400 `invalid_avatar` / 401 `unauthorized` / 404 `user_not_found` | 不变 |
 | 10 | POST | `/api/auth/refresh-cookie` | 无 | `{ ok:true }` + `Set-Cookie: ghub_gate` | Bearer | 401 `unauthorized` | **新增（P1）**：localStorage 有 token 但门禁 cookie 丢失/过期时补票，避免重复登录 |
 | 11 | GET | `/api/msg?limit=<n>` | `limit:number:选填`（默认 50，上限 50） | `[{ id:string, name:string, avatar:string, text:string, time:number }]` | 无 | — | **变**：一留言一键 + `KV.list` 并行取 + 15s 边缘缓存 |
-| 12 | POST | `/api/msg` | `text:string:必填`（≤500 字，去空白后非空） | `{ ok:true, id:string }` | Bearer | 400 `empty_text` / 401 `unauthorized` / 429 `msg_rate_limited`（**本轮新增**阈值：同一用户 10 分钟内最多 5 条，第 6 条起拒；现状没有任何留言限流） / 500 `write_failed` | **变**：单键单写，出参去掉 `count` |
+| 12 | POST | `/api/msg` | `text:string:必填`（≤500 字，去空白后非空） | `{ ok:true, id:string }` | Bearer | 400 `empty_text` / 401 `unauthorized` / 429 `msg_rate_limited`（**本轮新增**两条限制：①同一用户 10 分钟内最多 **8 条**；②**全站每日最多 200 条**。任一命中都回同一个 `msg_rate_limited`，前端用 `window` 区分档位（`"10m"` / `"day"`）；现状没有任何留言限流，验收时不要找既有基线） / 500 `write_failed` | **变**：单键单写，出参去掉 `count` |
 | 13 | DELETE | `/api/msg?id=<msgId>` | `id:string:必填` | `{ ok:true }` | Bearer + 管理员 | 400 `missing_id` / 401 `unauthorized` / 403 `admin_required` / 404 `msg_not_found` | **变**：单键 `delete` |
 | 14 | GET | `/api/ai/presets` | 无 | `{ ok:true, presets:[{ id:string, name:string, baseURL:string, model:string, desc:string }] }`（**永不含 key**） | Bearer | 401 `unauthorized` | 不变（**安全回归项**） |
 | 15 | POST | `/api/ai/presets` | `name:string:必填`、`baseURL:string:必填`(https)、`model:string:必填`、`key:string:必填`、`desc?:string`(≤120) | `{ ok:true, id:string }` | Bearer + 管理员 | 400 `invalid_preset` / 401 / 403 `admin_required` | 不变 |
@@ -221,7 +221,7 @@
 - **小时档与日档同时命中时，一律回日档**（`window:"day"`）——用户更需要知道「今天没得用了」，而不是「再等 20 分钟又被挡一次」。
 - `ip_rate_limited` 的 `window` 恒为 `"hour"`，`resetAt` = 下一个整点。
 - `global_quota_exceeded` 的 `resetAt` = 次日 00:00。
-- **时区固定按 UTC+8 计算日界**：Worker 跑在 UTC，若直接取 UTC 零点，用户会在「凌晨 4 点恢复」这种时刻看到额度回来。日键的 key 后缀（`YYYYMMDD`）与 `resetAt` 必须用同一套 UTC+8 计算，否则会出现「键还没过期但 resetAt 已过」的矛盾。
+- **时区固定按 UTC+8 计算日界**：Worker 跑在 UTC，若直接取 UTC 零点，用户会在「凌晨 4 点恢复」这种时刻看到额度回来。日键的 key 后缀（`YYYYMMDD`）与 `resetAt` 必须用同一套 UTC+8 计算，否则会出现「键还没过期但 resetAt 已过」的矛盾。**具体写法见 §6.5(b) 第 7 条（禁止 `getHours() + 8`）。**
 
 ---
 
@@ -756,10 +756,17 @@ curl -s -H "Authorization: Bearer <token>" $B/api/ai/presets | grep -c '"key"'
 
 **最大风险（一句话）**：删掉 Worker 里的 HTML 改写会让 `game.html` 失去「先挂载后设 src」的兜底，**必须同一次提交里把 `game.html` 的源码顺序也改对**（并把 `document.createElement` 那个伪兜底分支删掉），否则 Flash 会从「部分黑屏」变成「全部黑屏」，而这类回归没有任何自动化测试能发现——只能靠部署后真的打开 `/game?id=bleshui-vs-huoYing-3.3` 看一眼画面。
 
-**需要用户拍板的 1–3 个决策**：
-1. **部署方式选哪个？** 因为要产出 `dist/`，构建脚本必须有人执行：① `git init` + Pages Git 集成（Build command `node scripts/build.mjs`，Output directory `dist`）——一次配好，以后 push 即上线；② 继续手工上传，每次本地先跑 `node scripts/build.mjs` 再拖 `dist/`。推荐 ①，否则「忘了跑构建」会变成新的静默故障源。
-2. **AI 限流按「30 次/小时、100 次/天/用户，IP 60 次/小时，全站 300 次/天」执行吗？** 这组数字由 KV 免费写额度（1000 次/天）倒推；若觉得太紧，需要同意升级 Workers 付费套餐，否则会先把留言与登录的写入挤掉。
-3. **`SESSION_SECRET` 轮换即全员重登**这一运维代价能否接受？能 = 门禁走 HMAC（页面 0 次 KV 读，首屏最快）；不能 = 保留 KV 校验加 60 秒边缘缓存（首屏保留一次 KV 读，约几十毫秒）。
+**已裁定，不再作为待办问题**（写在这里是为了让后来的人知道这些是决定，不是遗留）：
+
+| 事项 | 裁定 | 依据 |
+|---|---|---|
+| 门禁校验方式 | **HMAC 签名 cookie**（页面请求 0 次 KV 读） | 「轮换 `SESSION_SECRET` 导致全员重登」不是真实代价——只在主动换密钥时发生；用它换掉每页一次 KV 读是划算的 |
+| AI 限流阈值 | **用户 30 次/小时、100 次/天；IP 60 次/小时；全站 300 次/天** | 由 KV 免费写额度（1000 次/天）倒推；要放宽须先升级 Workers 付费套餐，否则留言与登录的写入会先被挤掉 |
+| 构建与发布 | **`git init` + 推 GitHub + Pages Git 集成**（Build command `node scripts/build.mjs`，Output directory `dist`） | 构建必须有地方自动执行；手工上传会让「忘了跑构建」变成新的静默故障源 |
+
+**上线前需要用户提供的东西（不是决策，是输入）**：
+1. 三个环境变量的值：`GH_TOKEN`（已有）、`ADMIN_SETUP_CODE`（新生成 32 位随机串）、`SESSION_SECRET`（新生成 32 字节随机串）。**只配置到 Pages 环境变量里，不要写进仓库**。
+2. `minecraft-125` / `minecraft-classic` 的真实版本号确认（P1-11）：这两款正文里没有版本标识，名字可能是站方自拟；错的话 `data/games.json` 的 `name` 也要跟着改。
 
 ---
 
