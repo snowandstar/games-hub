@@ -179,7 +179,11 @@ export default {
     }
 
     // 整站登录门禁：除登录页与 API 外，未登录一律跳转登录页
-    if (path === "/" || path === "/index.html" || /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|account|ai-admin)/.test(path)) {
+    // 注意：正则末尾的 (?:[\/\?#.]|$) 是右边界，不能省。
+    // 省掉的话 /^\/game/ 会把 /games.json、/game-config.txt 这类静态数据文件也判成页面，
+    // 未登录访问它们会被 302 到登录页（前端 fetch('/games.json') 拿到 HTML，首页卡片直接空）。
+    const GATED = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin)(?:[\/\?#.]|$)/;
+    if (path === "/" || path === "/index.html" || GATED.test(path)) {
       const c = request.headers.get("Cookie") || "";
       const m = c.match(/(?:^|;\s*)ghub_token=([^;]+)/);
       const t = m ? decodeURIComponent(m[1]) : "";
