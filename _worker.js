@@ -63,7 +63,7 @@ const CSP_REPORT_ONLY = [
   "font-src 'self' data:",
   "connect-src 'self' https:",
   "worker-src 'self' blob:",
-  "frame-src 'self' https://4m8dv3g0c7b16.doubao.link",
+  "frame-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -77,22 +77,16 @@ const SECURITY_HEADERS = {
   "Content-Security-Policy-Report-Only": CSP_REPORT_ONLY
 };
 
-// AI 助手应用（妙搭 iframe）跨域调用站点 API 所需的 CORS 头
-const AI_CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "https://4m8dv3g0c7b16.doubao.link",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age": "86400"
-};
-
+// AI 助手已经改成站内页面直连（同源 fetch），不再需要跨域头。
+// 第三个参数 cors 保留只是为了不动下面二十多个调用点，传什么都不产生效果。
 function json(data, status, cors) {
+  void cors;
   return new Response(JSON.stringify(data), {
     status: status || 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      ...SECURITY_HEADERS,
-      ...(cors ? AI_CORS_HEADERS : {})
+      ...SECURITY_HEADERS
     }
   });
 }
@@ -495,9 +489,9 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // AI 接口跨域预检
+    // 同源调用不会发预检；这里保留 204 只是为了让浏览器里的旧预检不报错
     if (request.method === "OPTIONS" && path.startsWith("/api/ai/")) {
-      return new Response(null, { status: 204, headers: { ...AI_CORS_HEADERS, ...SECURITY_HEADERS } });
+      return new Response(null, { status: 204, headers: SECURITY_HEADERS });
     }
 
     // 整站登录门禁：除登录页与 API 外，未登录一律跳转登录页

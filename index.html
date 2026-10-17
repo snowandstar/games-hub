@@ -724,18 +724,65 @@ ul,ol{ padding: 0; list-style: none; }
 .steps li{ display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-3); align-items: start; }
 .steps .tip-num{ background: var(--surface-2); color: var(--text-2); }
 .steps span:last-child{ font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
-.ai-wrap{
-  margin-top: var(--sp-5);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
-  background: var(--surface-1); overflow: hidden;
+/* ---- 站内 AI 对话（不再嵌第三方 iframe） ---- */
+.ai-bar{
+  margin-top: var(--sp-4); display: flex; align-items: center; gap: var(--sp-2);
+  flex-wrap: wrap; max-width: 720px;
 }
-.ai-wrap iframe{
-  width: 100%; height: calc(100dvh - 220px); min-height: 520px;
-  border: 0; display: block; background: var(--bg-base);
+.ai-bar label{ font-size: var(--fs-sm); color: var(--text-2); }
+.ai-select{
+  flex: 1 1 200px; min-width: 0; max-width: 320px;
+  background: var(--surface-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 8px 10px; font-size: var(--fs-sm); font-family: inherit;
 }
-@media (max-width: 819px){ .ai-wrap iframe{ min-height: 70dvh; } }
+.ai-select:focus-visible{ outline: 2px solid var(--focus); outline-offset: 1px; }
+.ai-key{
+  margin-top: var(--sp-3); padding: var(--sp-4); max-width: 720px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1);
+  display: grid; gap: var(--sp-3);
+}
+.ai-key .field{ display: grid; gap: 6px; }
+.ai-key label{ font-size: var(--fs-xs); color: var(--text-2); }
+.ai-key input{
+  width: 100%; background: var(--bg-base); color: var(--text-1); font-family: inherit;
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 11px; font-size: var(--fs-sm);
+}
+.ai-key input:focus-visible{ outline: 2px solid var(--focus); outline-offset: 1px; }
+.ai-chat{
+  margin-top: var(--sp-3); max-width: 720px; height: min(52dvh, 460px); min-height: 280px;
+  overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1);
+  padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.ai-empty{ margin: auto; text-align: center; color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm); max-width: 380px; }
+.ai-msg{ display: flex; gap: var(--sp-2); }
+.ai-msg .who{
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: var(--fw-bold); background: var(--surface-2); color: var(--text-2);
+}
+.ai-msg .bubble{
+  min-width: 0; padding: 9px 12px; border-radius: var(--r-md);
+  font-size: var(--fs-sm); line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+}
+.ai-msg.bot .bubble{ background: var(--surface-2); color: var(--text-1); }
+.ai-msg.user{ flex-direction: row-reverse; }
+.ai-msg.user .bubble{ background: var(--accent-soft, rgba(167,139,250,.16)); color: var(--text-1); }
+.ai-msg.err .bubble{ background: rgba(248,113,113,.12); color: #fca5a5; border: 1px solid rgba(248,113,113,.3); }
+.ai-msg.typing .bubble{ color: var(--text-muted); }
+.ai-input{
+  margin-top: var(--sp-3); max-width: 720px; display: flex; gap: var(--sp-2); align-items: flex-end;
+}
+.ai-input textarea{
+  flex: 1; min-width: 0; resize: none; max-height: 132px;
+  background: var(--surface-1); color: var(--text-1); font-family: inherit;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 11px 12px;
+  font-size: var(--fs-sm); line-height: 1.5;
+}
+.ai-input textarea:focus-visible{ outline: 2px solid var(--focus); outline-offset: 1px; }
 .ai-actions{ margin-top: var(--sp-4); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .ai-note{ margin-top: var(--sp-4); font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); max-width: 560px; }
+.ai-note a{ color: var(--accent); }
 
 /* =========================================================== 弹窗 */
 .modal-overlay{
@@ -1130,21 +1177,45 @@ ul,ol{ padding: 0; list-style: none; }
       <div id="view-ai" hidden>
         <div class="view-head">
           <h2>AI 助手</h2>
-          <p>这是一个接你自己模型账号的对话应用，不是本站提供的免费次数。需要你自己有一个 API Key。</p>
+          <p>站长已经配好模型，登录后直接聊。想用自己的账号也行，填上你自己的 API Key 即可。</p>
         </div>
-        <ol class="steps">
-          <li><span class="tip-num" aria-hidden="true">1</span><span>点应用左下角的「设置」</span></li>
-          <li><span class="tip-num" aria-hidden="true">2</span><span>选一个服务商：DeepSeek / 豆包 / 通义 / Kimi</span></li>
-          <li><span class="tip-num" aria-hidden="true">3</span><span>把你自己申请的 API Key 填进去，就能开始对话</span></li>
-        </ol>
-        <div class="ai-wrap" id="aiWrap">
-          <iframe id="aiFrame" title="AI 助手" allow="clipboard-write; fullscreen" data-src="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz"></iframe>
+
+        <div class="ai-bar">
+          <label for="aiPreset">模型</label>
+          <select class="ai-select" id="aiPreset">
+            <option value="">加载中…</option>
+          </select>
+          <button class="btn btn--secondary btn--sm" type="button" id="aiOwnBtn" aria-expanded="false" aria-controls="aiKeyPanel">用自己的 Key</button>
+          <button class="btn btn--secondary btn--sm" type="button" id="aiClear">清空对话</button>
         </div>
-        <div class="ai-actions">
-          <a class="btn btn--primary" href="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz" target="_blank" rel="noopener">在新窗口打开</a>
-          <a class="btn btn--secondary" href="#games" data-view="games">回游戏中心</a>
+
+        <div class="ai-key" id="aiKeyPanel" hidden>
+          <div class="field">
+            <label for="aiBase">API 地址（要含 /v1）</label>
+            <input id="aiBase" type="url" inputmode="url" autocomplete="off" placeholder="https://api.deepseek.com/v1">
+          </div>
+          <div class="field">
+            <label for="aiModel">模型名</label>
+            <input id="aiModel" type="text" autocomplete="off" placeholder="deepseek-chat">
+          </div>
+          <div class="field">
+            <label for="aiKey">API Key</label>
+            <input id="aiKey" type="password" autocomplete="off" placeholder="sk-…">
+          </div>
+          <p class="ai-note" style="margin:0">Key 只存在你这台设备的浏览器里，不会上传到本站服务器，换设备要重填。</p>
         </div>
-        <p class="ai-note">Key 只存在你自己的浏览器里，不会上传到本站，也不会存在服务器上。换设备要重填。</p>
+
+        <div class="ai-chat" id="aiChat" role="log" aria-live="polite" aria-label="对话内容">
+          <div class="ai-empty" id="aiEmpty">
+            <p>问它「哪款游戏不吃配置」「我的世界怎么联机」都行。<br>按 Enter 发送，Shift+Enter 换行。</p>
+          </div>
+        </div>
+
+        <form class="ai-input" id="aiForm">
+          <textarea id="aiText" rows="1" maxlength="2000" placeholder="说点什么…" aria-label="输入消息"></textarea>
+          <button class="btn btn--primary" type="submit" id="aiSend">发送</button>
+        </form>
+        <p class="ai-note" id="aiNote">登录后才能用。每条消息会占用一次对话额度。</p>
       </div>
     </div>
 
@@ -1222,7 +1293,6 @@ ul,ol{ padding: 0; list-style: none; }
 
   var TOKEN_KEY = "ghub_token";
   var USER_KEY = "ghub_user";
-  var AI_APP_ORIGIN = "https://4m8dv3g0c7b16.doubao.link";
 
   /* ---------------- 小工具 ---------------- */
   function $(id) { return document.getElementById(id); }
@@ -1263,7 +1333,7 @@ ul,ol{ padding: 0; list-style: none; }
   }
 
   /* ---------------- 视图切换 ---------------- */
-  var aiLoaded = false;
+  var aiInited = false;
 
   function setView(v, noScroll) {
     var isAi = v === "ai";
@@ -1275,38 +1345,259 @@ ul,ol{ padding: 0; list-style: none; }
       else a.removeAttribute("aria-current");
     });
 
-    if (isAi) loadAi();
+    if (isAi) initAi();
     else if (!noScroll) try { window.scrollTo(0, 0); } catch (e) {}
   }
 
-  function loadAi() {
-    if (aiLoaded) return;
-    aiLoaded = true;
-    var f = $("aiFrame");
-    if (!f) return;
-    var src = f.getAttribute("data-src");
-    f.addEventListener("load", function () {
-      watchAi.ok = true;
-      sendTokenToAi();
-    });
-    f.src = src;
-    watchAi();
+  /* ---------------- AI 助手（站内实现，不再嵌第三方 iframe） ----------------
+     原来这里 iframe 嵌的是妙搭（豆包）搭的应用，靠 postMessage 把登录 token 传进去，
+     再让那个应用跨域调本站 /api/ai/chat。豆包那边后来要求账号授权，
+     嵌入页会 302 到 accounts.doubao.com，面板里就只剩豆包登录页了。
+     现在改成站内直连 /api/ai/chat，同源、不再传 token、也不依赖第三方。 */
+  var AI_HIST_KEY = "ghub_ai_hist";   // 对话历史（本机）
+  var AI_CFG_KEY = "ghub_ai_cfg";     // 自己的 Key 配置（本机）
+  var AI_HIST_MAX = 20;               // 最多保留 20 条消息（服务端也只收最后 10 轮）
+  var aiMessages = [];                // [{role, content}]
+  var aiPresets = [];                 // [{id,name,model,desc}]
+  var aiMode = "preset";              // preset | own
+  var aiSending = false;
+
+  function aiLoadHist() {
+    try {
+      var h = JSON.parse(localStorage.getItem(AI_HIST_KEY) || "[]");
+      if (Array.isArray(h)) aiMessages = h.filter(function (m) { return m && m.role && typeof m.content === "string"; }).slice(-AI_HIST_MAX);
+    } catch (e) { aiMessages = []; }
+  }
+  function aiSaveHist() {
+    try { localStorage.setItem(AI_HIST_KEY, JSON.stringify(aiMessages.slice(-AI_HIST_MAX))); } catch (e) {}
+  }
+  function aiLoadCfg() {
+    try { return JSON.parse(localStorage.getItem(AI_CFG_KEY) || "null") || {}; } catch (e) { return {}; }
+  }
+  function aiSaveCfg(cfg) {
+    try { localStorage.setItem(AI_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
   }
 
-  function watchAi() {
-    setTimeout(function () {
-      if (watchAi.ok) return;
-      var w = $("aiWrap");
-      if (!w) return;
-      w.innerHTML =
-        '<div class="games" style="display:block;padding:48px 20px;text-align:center">' +
-        '<p style="font-size:18px;font-weight:600;margin-bottom:8px">AI 助手没能加载出来</p>' +
-        '<p style="font-size:13px;line-height:1.7;color:var(--text-2);max-width:360px;margin:0 auto 16px">可能是网络被拦了，或者应用暂时不可用。</p>' +
-        '<a class="btn btn--primary" href="' + AI_APP_ORIGIN + '/app/app_17fuk4uu4pz" target="_blank" rel="noopener">在新窗口打开试试</a>' +
-        "</div>";
-    }, 12000);
+  function aiScrollBottom() {
+    var box = $("aiChat");
+    if (box) box.scrollTop = box.scrollHeight;
   }
-  watchAi.ok = false;
+
+  function aiBubble(role, text, cls) {
+    var wrap = document.createElement("div");
+    wrap.className = "ai-msg " + (cls || (role === "user" ? "user" : "bot"));
+    var who = document.createElement("span");
+    who.className = "who";
+    who.textContent = role === "user" ? "我" : "AI";
+    var b = document.createElement("div");
+    b.className = "bubble";
+    b.textContent = text;
+    wrap.appendChild(who);
+    wrap.appendChild(b);
+    $("aiChat").appendChild(wrap);
+    aiScrollBottom();
+    return wrap;
+  }
+
+  function aiRenderHist() {
+    var box = $("aiChat");
+    box.innerHTML = "";
+    if (!aiMessages.length) {
+      box.innerHTML = '<div class="ai-empty" id="aiEmpty"><p>问它「哪款游戏不吃配置」「我的世界怎么联机」都行。<br>按 Enter 发送，Shift+Enter 换行。</p></div>';
+      return;
+    }
+    aiMessages.forEach(function (m) {
+      aiBubble(m.role === "user" ? "user" : "assistant", m.content);
+    });
+    aiScrollBottom();
+  }
+
+  function aiSetNote(txt) {
+    var n = $("aiNote");
+    if (n) n.innerHTML = txt;
+  }
+
+  function aiSyncAuth() {
+    var logged = !!getToken();
+    $("aiSend").disabled = !logged || aiSending;
+    $("aiText").disabled = !logged;
+    if (!logged) {
+      aiSetNote('登录后才能用。<a href="#login">去登录</a>');
+    } else if (!aiPresets.length && aiMode !== "own") {
+      aiSetNote('站长还没配预设模型，点「用自己的 Key」填一个就能用。');
+    } else {
+      aiSetNote("每条消息会占用一次对话额度，超了会提示你等一会儿。");
+    }
+  }
+
+  function aiRenderPresetSelect() {
+    var sel = $("aiPreset");
+    sel.innerHTML = "";
+    if (aiPresets.length) {
+      aiPresets.forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p.id;
+        o.textContent = p.name + (p.desc ? " · " + p.desc : "");
+        sel.appendChild(o);
+      });
+      var ownOpt = document.createElement("option");
+      ownOpt.value = "__own__";
+      ownOpt.textContent = "用自己的 Key";
+      sel.appendChild(ownOpt);
+    } else {
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "站长还没配预设模型";
+      sel.appendChild(none);
+    }
+    sel.value = aiMode === "own" ? "__own__" : (aiPresets[0] ? aiPresets[0].id : "");
+    sel.disabled = !aiPresets.length;
+  }
+
+  function aiToggleKeyPanel(show) {
+    var panel = $("aiKeyPanel");
+    var btn = $("aiOwnBtn");
+    var willShow = typeof show === "boolean" ? show : panel.hidden;
+    panel.hidden = !willShow;
+    btn.setAttribute("aria-expanded", willShow ? "true" : "false");
+    if (willShow) {
+      var cfg = aiLoadCfg();
+      $("aiBase").value = cfg.baseURL || "";
+      $("aiModel").value = cfg.model || "";
+      $("aiKey").value = cfg.key || "";
+      $("aiBase").focus();
+    }
+  }
+
+  async function initAi() {
+    aiSyncAuth();
+    if (aiInited) { $("aiText").focus(); return; }
+    aiInited = true;
+    aiLoadHist();
+    aiRenderHist();
+    // 预设模型：登录才能取（接口本身也要求登录）
+    if (getToken()) {
+      try {
+        var r = await fetch("/api/ai/presets", { headers: { "Authorization": "Bearer " + getToken() } });
+        var d = await r.json();
+        if (d && d.ok && Array.isArray(d.presets)) aiPresets = d.presets;
+      } catch (e) { /* 网络问题就当没有预设，用户还能自带 Key */ }
+    }
+    aiRenderPresetSelect();
+    // 没预设时直接把「用自己的 Key」展开，别让人找不到入口
+    if (!aiPresets.length) aiToggleKeyPanel(true);
+    aiSyncAuth();
+  }
+
+  function aiSendMsg() {
+    var ta = $("aiText");
+    var text = (ta.value || "").trim();
+    if (!text || aiSending) return;
+    if (!getToken()) { toast("先登录才能用 AI 助手", "info"); return; }
+
+    var body = { messages: aiMessages.concat([{ role: "user", content: text }]) };
+    if (aiMode === "own") {
+      var cfg = {
+        baseURL: ($("aiBase").value || "").trim(),
+        model: ($("aiModel").value || "").trim(),
+        key: ($("aiKey").value || "").trim()
+      };
+      if (!cfg.baseURL || !cfg.model || !cfg.key) {
+        toast("API 地址、模型名、Key 都要填", "info");
+        aiToggleKeyPanel(true);
+        return;
+      }
+      aiSaveCfg(cfg);
+      body.baseURL = cfg.baseURL;
+      body.model = cfg.model;
+      body.key = cfg.key;
+    } else {
+      var pid = $("aiPreset").value;
+      if (!pid) { toast("先选一个模型", "info"); return; }
+      body.preset_id = pid;
+    }
+
+    // 乐观更新：先把用户这句挂上去，失败再补一条错误气泡
+    var emptyHint = document.getElementById("aiEmpty");
+    if (emptyHint) emptyHint.remove();
+    aiMessages.push({ role: "user", content: text });
+    aiSaveHist();
+    aiBubble("user", text);
+    ta.value = "";
+    ta.style.height = "";
+    aiSending = true;
+    $("aiSend").disabled = true;
+    $("aiSend").textContent = "发送中…";
+    var typing = aiBubble("assistant", "思考中…", "bot typing");
+
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 60000);
+
+    fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + getToken() },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    }).then(function (r) {
+      return r.json().then(function (d) { return { st: r.status, d: d }; });
+    }).then(function (res) {
+      clearTimeout(timer);
+      typing.remove();
+      if (res.d && res.d.ok && res.d.content) {
+        aiMessages.push({ role: "assistant", content: res.d.content });
+        aiSaveHist();
+        aiBubble("assistant", res.d.content);
+      } else {
+        var msg = (res.d && res.d.error) || ("请求失败（HTTP " + res.st + "）");
+        if (res.st === 429 && res.d && res.d.resetAt) {
+          msg += "（" + new Date(res.d.resetAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) + " 之后恢复）";
+        }
+        aiBubble("assistant", msg, "bot err");
+        // 失败的那句从历史里撤掉，避免下次重发时重复
+        aiMessages = aiMessages.filter(function (m, i) { return !(i === aiMessages.length - 1 && m.role === "user"); });
+        aiSaveHist();
+      }
+    }).catch(function (err) {
+      clearTimeout(timer);
+      typing.remove();
+      var m = err && err.name === "AbortError" ? "等太久了，超时了，稍后再试" : "网络出问题了，稍后再试";
+      aiBubble("assistant", m, "bot err");
+    }).finally(function () {
+      aiSending = false;
+      $("aiSend").disabled = false;
+      $("aiSend").textContent = "发送";
+      aiScrollBottom();
+    });
+  }
+
+  /* 事件绑定（AI 视图） */
+  $("aiForm").addEventListener("submit", function (ev) { ev.preventDefault(); aiSendMsg(); });
+  $("aiText").addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); aiSendMsg(); }
+  });
+  $("aiText").addEventListener("input", function () {
+    var ta = $("aiText");
+    ta.style.height = "auto";
+    ta.style.height = Math.min(132, ta.scrollHeight) + "px";
+  });
+  $("aiPreset").addEventListener("change", function () {
+    if (this.value === "__own__") { aiMode = "own"; aiToggleKeyPanel(true); }
+    else { aiMode = "preset"; aiToggleKeyPanel(false); }
+    aiSyncAuth();
+  });
+  $("aiOwnBtn").addEventListener("click", function () {
+    var show = $("aiKeyPanel").hidden;
+    aiMode = show ? "own" : (aiPresets.length ? "preset" : "own");
+    if (aiPresets.length) $("aiPreset").value = show ? "__own__" : aiPresets[0].id;
+    aiToggleKeyPanel(show);
+    aiSyncAuth();
+  });
+  $("aiClear").addEventListener("click", function () {
+    aiMessages = [];
+    aiSaveHist();
+    aiRenderHist();
+    toast("对话已清空", "info");
+  });
 
   function applyHash() {
     var h = (location.hash || "").replace("#", "");
@@ -1689,19 +1980,6 @@ ul,ol{ padding: 0; list-style: none; }
       saveUser(null);
       location.href = "/login";
     });
-  });
-
-  /* ---------------- AI iframe 传 token ---------------- */
-  function sendTokenToAi() {
-    var f = $("aiFrame");
-    var t = getToken();
-    if (f && f.contentWindow && t && f.src) {
-      try { f.contentWindow.postMessage({ type: "ghub-token", token: t }, AI_APP_ORIGIN); } catch (e) {}
-    }
-  }
-  window.addEventListener("message", function (e) {
-    if (e.origin !== AI_APP_ORIGIN) return;
-    if (e.data && e.data.type === "ghub-request-token") sendTokenToAi();
   });
 
   /* ---------------- 锚点与视图 ---------------- */
