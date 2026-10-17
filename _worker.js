@@ -755,9 +755,26 @@ export default {
         }
         await migrateMsgs(env);
         const list = await readMsgs(env, limit);
+        // 输出归一化：补齐新字段默认值 + 截断上限，历史数据没有这些字段也不炸。
+        // 置顶优先，其余按时间倒序。
+        const norm = list.map(m => ({
+          id: m.id,
+          name: m.name || "匿名",
+          avatar: m.avatar || "",
+          text: m.text || "",
+          time: m.time || 0,
+          pinned: !!m.pinned,
+          likes: Math.max(0, parseInt(m.likes, 10) || 0),
+          likedBy: Array.isArray(m.likedBy) ? m.likedBy.slice(0, 200) : [],
+          replies: (Array.isArray(m.replies) ? m.replies : []).slice(0, 30)
+            .map(r => ({
+              id: r.id, name: r.name || "匿名", avatar: r.avatar || "",
+              text: r.text || "", time: r.time || 0
+            })).filter(r => r.text)
+        })).sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.time || 0) - (a.time || 0)));
         // 15 秒边缘缓存：把「每次刷新 50 次 KV 读」压到「每 colo 每 15 秒 50 次」。
         // 必须给 public + max-age，no-store 的响应 Cache API 不会存。
-        const resp = new Response(JSON.stringify(list), {
+        const resp = new Response(JSON.stringify(norm), {
           headers: {
             "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": `public, max-age=${MSG_CACHE_TTL}`,
@@ -778,6 +795,24 @@ export default {
           const body = await request.json();
           const text = String(body.text || "").trim().slice(0, 500);
           if (!text) return json({ error: "留言内容不能为空", code: "empty_text" }, 400);
+          // 回复模式：带 replyTo 就是楼中楼回复，正文上限收到 200 字
+          const replyTo = String(body.replyTo || "").trim();
+          if (replyTo) {
+            const parent = await env.MSG_KV.get("msg:" + replyTo, "json");
+            if (!parent) return json({ error: "回复的留言不存在或已删除", code: "parent_not_found" }, 404);
+            const replies = Array.isArray(parent.replies) ? parent.replies : [];
+            if (replies.length >= 30) {
+              return json({ error: "这条留言的回复已达上限", code: "replies_full" }, 400);
+            }
+            const rid = newMsgId(now);
+            replies.push({ id: rid, name: auth.username, avatar: auth.avatar || "", text: text.slice(0, 200), time: now });
+            parent.replies = replies;
+            await env.MSG_KV.put("msg:" + replyTo, JSON.stringify(parent), { expirationTtl: MSG_TTL });
+            try {
+              ctx.waitUntil(caches.default.delete(new URL("/api/msg", url).toString()));
+            } catch (e) { /* 缓存清不掉最多晚 15 秒 */ }
+            return json({ ok: true, id: replyTo, replyId: rid });
+          }
           // 限流：同一用户 10 分钟 8 条、全站 200 条/天。
           // 计数键靠 TTL 自动过期，不用 delete（delete 也占 KV 免费写额度）。
           const now = Date.now();
@@ -817,12 +852,16 @@ export default {
       }
       if (request.method === "DELETE") {
         const auth = await getAuth(request, env);
-        if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+        if (!auth) return json({ error: "请先登录", code: "unauthorized" }, 401);
         const id = url.searchParams.get("id") || "";
         if (!id) return json({ error: "缺少留言 id", code: "missing_id" }, 400);
         // 先校验存在（KV.delete 删不存在的键也返回成功，不校验的话前端永远看到“删除成功”）
         const cur = await env.MSG_KV.get("msg:" + id, "json");
         if (!cur) return json({ error: "留言不存在", code: "msg_not_found" }, 404);
+        // 管理员可删任意；普通用户只能删自己发的
+        if (!auth.admin && cur.name !== auth.username) {
+          return json({ error: "只能删除自己的留言", code: "forbidden" }, 403);
+        }
         await env.MSG_KV.delete("msg:" + id);
         // 存量 msgs 里可能还有同一条，一并去掉，避免删完又从旧键合并回来
         const legacy = (await env.MSG_KV.get("msgs", "json")) || [];
@@ -832,6 +871,62 @@ export default {
         return json({ ok: true });
       }
       return json({ error: "method not allowed", code: "method_not_allowed" }, 405);
+    }
+
+    // 点赞 / 取消点赞（登录；防手抖连点：每用户 10 分钟 20 次）
+    // 点赞数与 likedBy 内联在留言记录里：个人站规模下并发丢赞可接受，
+    // 换来 GET 单次调用就能带全数据（独立键方案每次要 50 次 KV 读，不划算）。
+    if (path === "/api/msg/like" && request.method === "POST") {
+      const auth = await getAuth(request, env);
+      if (!auth) return json({ error: "请先登录", code: "unauthorized" }, 401);
+      let body = null;
+      try { body = await request.json(); } catch (e) {}
+      const id = String(body && body.id || "");
+      if (!id) return json({ error: "缺少留言 id", code: "missing_id" }, 400);
+      const now = Date.now();
+      const lkKey = "msgq:lk:" + auth.username + ":" + Math.floor(now / MSG_RATE_USER_WIN);
+      const lkN = parseInt(await env.MSG_KV.get(lkKey) || "0", 10);
+      if (lkN >= 20) {
+        return json({ error: "操作太频繁了，歇一会儿", code: "rate_limited" }, 429);
+      }
+      const msg = await env.MSG_KV.get("msg:" + id, "json");
+      if (!msg) return json({ error: "留言不存在", code: "msg_not_found" }, 404);
+      const likedBy = Array.isArray(msg.likedBy) ? msg.likedBy : [];
+      const had = likedBy.indexOf(auth.username) >= 0;
+      if (had) {
+        msg.likedBy = likedBy.filter(u => u !== auth.username);
+        msg.likes = Math.max(0, (parseInt(msg.likes, 10) || 1) - 1);
+      } else {
+        if (likedBy.length >= 200) return json({ error: "这条留言的点赞已达上限", code: "likes_full" }, 400);
+        likedBy.push(auth.username);
+        msg.likedBy = likedBy;
+        msg.likes = (parseInt(msg.likes, 10) || 0) + 1;
+      }
+      await env.MSG_KV.put("msg:" + id, JSON.stringify(msg), { expirationTtl: MSG_TTL });
+      ctx.waitUntil(env.MSG_KV.put(lkKey, String(lkN + 1), { expirationTtl: 900 }));
+      try {
+        ctx.waitUntil(caches.default.delete(new URL("/api/msg", url).toString()));
+      } catch (e) { /* 缓存清不掉最多晚 15 秒 */ }
+      return json({ ok: true, liked: !had, likes: msg.likes });
+    }
+
+    // 置顶 / 取消置顶（管理员）
+    if (path === "/api/msg/pin" && request.method === "POST") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+      let body = null;
+      try { body = await request.json(); } catch (e) {}
+      const id = String(body && body.id || "");
+      const pin = !!(body && body.pin);
+      if (!id) return json({ error: "缺少留言 id", code: "missing_id" }, 400);
+      const msg = await env.MSG_KV.get("msg:" + id, "json");
+      if (!msg) return json({ error: "留言不存在", code: "msg_not_found" }, 404);
+      if (pin) msg.pinned = true; else delete msg.pinned;
+      await env.MSG_KV.put("msg:" + id, JSON.stringify(msg), { expirationTtl: MSG_TTL });
+      try {
+        ctx.waitUntil(caches.default.delete(new URL("/api/msg", url).toString()));
+      } catch (e) { /* 缓存清不掉最多晚 15 秒 */ }
+      return json({ ok: true, pinned: pin });
     }
 
     // ===== AI 助手：预设模型管理与聊天代理（CORS 允许妙搭应用调用）=====
