@@ -109,6 +109,71 @@ function json(data, status, cors) {
   });
 }
 
+// ---------- 留言板：一条留言一个 KV 键 ----------
+// 旧实现是 msgs 单键 read-modify-write（get → push → put）：两个并发请求读到同一份数组，
+// 后写的覆盖先写的，必丢数据；change-username 还在同一个键上做第二次 RMW，风险叠加。
+// 改成单键单写后，写操作之间不再有共享状态。
+const MSG_TTL = 365 * 86400;
+const MSG_RATE_USER_MAX = 8;      // 同一用户 10 分钟 8 条
+const MSG_RATE_USER_WIN = 600000; // 10 分钟
+const MSG_RATE_DAY_MAX = 200;     // 全站每天 200 条
+const MSG_CACHE_TTL = 15;         // 列表 15 秒边缘缓存
+
+// id = 倒序时间戳(13 位补零) + '-' + 随机 3 字节 hex。
+// 倒序时间戳做前缀，KV.list 的字典序天然就是时间倒序，取最近 N 条不需要再排序。
+function newMsgId(time) {
+  return String(9999999999999 - (time || Date.now())).padStart(13, "0") + "-" + randHex(3);
+}
+// 存量迁移：旧 msgs 里的 id 已是 base36 时间戳，直接复用（保证顺序不乱）；缺失则补当前时间
+function legacyMsgId(m) {
+  if (m && m.id && /^[a-z0-9-]{4,40}$/i.test(m.id)) return String(m.id);
+  return newMsgId(m && m.time ? m.time : undefined);
+}
+async function migrateMsgs(env) {
+  if (await env.MSG_KV.get("migrated:msgs2")) return;
+  const old = (await env.MSG_KV.get("msgs", "json")) || [];
+  if (Array.isArray(old) && old.length) {
+    await Promise.all(old.map(m =>
+      env.MSG_KV.put("msg:" + legacyMsgId(m), JSON.stringify({
+        id: legacyMsgId(m), name: m.name || "匿名", avatar: m.avatar || "", text: m.text || "", time: m.time || Date.now()
+      }), { expirationTtl: MSG_TTL })
+    ));
+  }
+  await env.MSG_KV.put("migrated:msgs2", String(Date.now()));
+}
+// 读列表：新键（倒序前 50）+ 旧 msgs（若还在）合并。旧键保留 30 天不删，防回填失败丢留言。
+async function readMsgs(env, limit) {
+  const list = await env.MSG_KV.list({ prefix: "msg:", limit });
+  const items = await Promise.all(list.keys.map(k => env.MSG_KV.get(k.name, "json").catch(() => null)));
+  const out = items.filter(m => m && m.id);
+  const legacy = (await env.MSG_KV.get("msgs", "json")) || [];
+  if (Array.isArray(legacy) && legacy.length) {
+    const seen = new Set(out.map(m => m.id));
+    for (const m of legacy) {
+      const id = legacyMsgId(m);
+      if (!seen.has(id)) { seen.add(id); out.push({ ...m, id }); }
+    }
+    // 迁移期两套 id 混在一起，按 time 倒序排一次（稳定期新键已有序，这次排序几乎不耗时）
+    out.sort((a, b) => (b.time || 0) - (a.time || 0));
+  }
+  return out.slice(0, limit);
+}
+// UTC+8 的“墙上时间” —— 日键后缀与 resetAt 必须用同一套计算，
+// 否则会出现「键还在限流、resetAt 却已过期」的矛盾。
+// 禁止用 new Date().getHours() + 8：环境时区不可依赖，且不取模跨零点必错（22 点算成 30 点）。
+function cnParts(now) {
+  const cn = new Date((now || Date.now()) + 8 * 3600 * 1000);
+  const iso = cn.toISOString();
+  return {
+    ymd: iso.slice(0, 10).replace(/-/g, ""),
+    ymdh: iso.slice(0, 13).replace(/[-T]/g, ""),
+    // 次日 00:00(UTC+8) 的 epoch ms：用 Date.UTC 处理月末/跨年进位，再减 8 小时回落
+    nextDay: Date.UTC(cn.getUTCFullYear(), cn.getUTCMonth(), cn.getUTCDate() + 1) - 8 * 3600 * 1000,
+    // 下一个整点是绝对时刻，与时区无关
+    nextHour: Math.ceil(Date.now() / 3600000) * 3600000
+  };
+}
+
 // ---------- 账号系统辅助函数 ----------
 const PBKDF2_ITER = 100000;
 const SESSION_TTL = 3600 * 24 * 30; // 30 天
@@ -477,15 +542,9 @@ export default {
       if (!old) return json({ error: "账号不存在" }, 404);
       await env.MSG_KV.put("user:" + nn, JSON.stringify({ ...old, username: nn }));
       await env.MSG_KV.delete("user:" + auth.username);
-      // 更新历史留言里的名字
-      const msgs = (await env.MSG_KV.get("msgs", "json")) || [];
-      if (Array.isArray(msgs) && msgs.length) {
-        let changed = false;
-        for (const m of msgs) {
-          if (m.name === auth.username) { m.name = nn; changed = true; }
-        }
-        if (changed) await env.MSG_KV.put("msgs", JSON.stringify(msgs));
-      }
+      // 不再改写历史留言里的名字：留言存的 name 是发布时的快照。
+      // 旧实现在这里对 msgs 单键做第二次 read-modify-write，和 POST /api/msg 抢同一个键，
+      // 并发下会互相覆盖。代价是改名后旧留言仍显示旧名——数据完整性比显示名重要。
       // 重新签发会话（新 token 绑定新用户名）
       const oldTok = bearerToken(request);
       if (oldTok) await env.MSG_KV.delete("sess:" + oldTok);
@@ -561,40 +620,91 @@ export default {
       return new Response(JSON.stringify({ ok: true }), { headers: h });
     }
 
-    // 留言板接口（Cloudflare KV 持久化；发留言必须登录，管理员可删除）
+    // 留言板接口（一条留言一个 KV 键；发留言必须登录，管理员可删除）
     if (path === "/api/msg") {
       if (request.method === "GET") {
-        const v = await env.MSG_KV.get("msgs", "json");
-        return json(Array.isArray(v) ? v : []);
+        // limit 默认 50、上限 50（再多也只展示一屏，且 KV 读是线性成本）
+        const n = parseInt(url.searchParams.get("limit") || "50", 10);
+        const limit = Number.isFinite(n) && n > 0 ? Math.min(n, 50) : 50;
+        const cacheKey = new Request(url.toString(), { method: "GET" });
+        try {
+          const hit = await caches.default.match(cacheKey);
+          if (hit) return hit;
+        } catch (e) {
+          // Cache API 不可用时直接回源，不影响功能
+        }
+        await migrateMsgs(env);
+        const list = await readMsgs(env, limit);
+        // 15 秒边缘缓存：把「每次刷新 50 次 KV 读」压到「每 colo 每 15 秒 50 次」。
+        // 必须给 public + max-age，no-store 的响应 Cache API 不会存。
+        const resp = new Response(JSON.stringify(list), {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": `public, max-age=${MSG_CACHE_TTL}`,
+            ...SECURITY_HEADERS
+          }
+        });
+        try {
+          ctx.waitUntil(caches.default.put(cacheKey, resp.clone()));
+        } catch (e) {
+          // 写缓存失败无所谓，下次回源
+        }
+        return resp;
       }
       if (request.method === "POST") {
         const auth = await getAuth(request, env);
-        if (!auth) return json({ error: "请先登录再留言" }, 401);
+        if (!auth) return json({ error: "请先登录再留言", code: "unauthorized" }, 401);
         try {
           const body = await request.json();
           const text = String(body.text || "").trim().slice(0, 500);
-          if (!text) return json({ error: "留言内容不能为空" }, 400);
-          const list = (await env.MSG_KV.get("msgs", "json")) || [];
-          list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: auth.username, avatar: auth.avatar, text, time: Date.now() });
-          if (list.length > 200) list.splice(0, list.length - 200);
-          await env.MSG_KV.put("msgs", JSON.stringify(list));
-          return json({ ok: true, count: list.length });
+          if (!text) return json({ error: "留言内容不能为空", code: "empty_text" }, 400);
+          // 限流：同一用户 10 分钟 8 条、全站 200 条/天。
+          // 计数键靠 TTL 自动过期，不用 delete（delete 也占 KV 免费写额度）。
+          const now = Date.now();
+          const p = cnParts(now);
+          const uKey = "msgq:u:" + auth.username + ":" + Math.floor(now / MSG_RATE_USER_WIN);
+          const dKey = "msgq:all:" + p.ymd;
+          const [uN, dN] = await Promise.all([
+            env.MSG_KV.get(uKey), env.MSG_KV.get(dKey)
+          ]);
+          const uCount = parseInt(uN || "0", 10);
+          const dCount = parseInt(dN || "0", 10);
+          if (dCount >= MSG_RATE_DAY_MAX) {
+            return json({ error: "今天全站留言额度用完了，明天再来", code: "msg_rate_limited", window: "day", resetAt: p.nextDay }, 429);
+          }
+          if (uCount >= MSG_RATE_USER_MAX) {
+            // window 用 "10m"（契约 §4.1 第 12 条），不是 AI 限流的 "hour"
+            return json({ error: "留言太频繁了，歇 10 分钟再发", code: "msg_rate_limited", window: "10m", resetAt: (Math.floor(now / MSG_RATE_USER_WIN) + 1) * MSG_RATE_USER_WIN }, 429);
+          }
+          const id = newMsgId(now);
+          const msg = { id, name: auth.username, avatar: auth.avatar || "", text, time: now };
+          await env.MSG_KV.put("msg:" + id, JSON.stringify(msg), { expirationTtl: MSG_TTL });
+          ctx.waitUntil(Promise.all([
+            env.MSG_KV.put(uKey, String(uCount + 1), { expirationTtl: 900 }),
+            env.MSG_KV.put(dKey, String(dCount + 1), { expirationTtl: 86400 })
+          ]));
+          return json({ ok: true, id });
         } catch (e) {
-          return json({ error: `留言写入失败: ${e.message}` }, 500);
+          return json({ error: `留言写入失败: ${e.message}`, code: "write_failed" }, 500);
         }
       }
       if (request.method === "DELETE") {
         const auth = await getAuth(request, env);
-        if (!auth || !auth.admin) return json({ error: "需要管理员权限" }, 403);
+        if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
         const id = url.searchParams.get("id") || "";
-        if (!id) return json({ error: "缺少留言 id" }, 400);
-        const list = (await env.MSG_KV.get("msgs", "json")) || [];
-        const next = list.filter(m => m.id !== id);
-        if (next.length === list.length) return json({ error: "留言不存在" }, 404);
-        await env.MSG_KV.put("msgs", JSON.stringify(next));
+        if (!id) return json({ error: "缺少留言 id", code: "missing_id" }, 400);
+        // 先校验存在（KV.delete 删不存在的键也返回成功，不校验的话前端永远看到“删除成功”）
+        const cur = await env.MSG_KV.get("msg:" + id, "json");
+        if (!cur) return json({ error: "留言不存在", code: "msg_not_found" }, 404);
+        await env.MSG_KV.delete("msg:" + id);
+        // 存量 msgs 里可能还有同一条，一并去掉，避免删完又从旧键合并回来
+        const legacy = (await env.MSG_KV.get("msgs", "json")) || [];
+        if (Array.isArray(legacy) && legacy.some(m => legacyMsgId(m) === id)) {
+          await env.MSG_KV.put("msgs", JSON.stringify(legacy.filter(m => legacyMsgId(m) !== id)));
+        }
         return json({ ok: true });
       }
-      return json({ error: "method not allowed" }, 405);
+      return json({ error: "method not allowed", code: "method_not_allowed" }, 405);
     }
 
     // ===== AI 助手：预设模型管理与聊天代理（CORS 允许妙搭应用调用）=====
