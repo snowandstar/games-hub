@@ -170,11 +170,16 @@ function boot() {
         fc.innerHTML = "";
         const url = API_BASE + "/swf?id=" + encodeURIComponent(game.id);
         fc.style.display = "block";
-        const player = (window.RufflePlayer && window.RufflePlayer.newest())
-          ? window.RufflePlayer.newest().createPlayer()
-          : document.createElement("ruffle-player");
-        player.src = url;
-        // Ruffle 加载/出错事件
+        // Ruffle 未加载（脚本被拦截或加载失败）时直接报错。
+        // 不再用 document.createElement("ruffle-player") 兜底：自定义元素并未注册，
+        // 拿到的是个空壳元素，只会把错误推迟到更晚、更难排查。
+        if (!(window.RufflePlayer && window.RufflePlayer.newest)) {
+          showError("Flash 模拟器（Ruffle）未能加载，请检查网络或刷新页面重试。", true);
+          return;
+        }
+        const player = window.RufflePlayer.newest().createPlayer();
+        // 事件监听必须挂在设置 src 之前：loadedmetadata 是 src 生效后才触发的，
+        // 若先设 src 再挂监听，加载极快时可能错过该事件，加载遮罩就永远不会消失。
         player.addEventListener("loadedmetadata", () => {
           document.getElementById("loading").style.display = "none";
         });
@@ -182,10 +187,12 @@ function boot() {
           console.error("Ruffle error:", e);
           showError("游戏加载失败，可能是文件较大或模拟器不兼容。可刷新重试。", true);
         });
-        // 兜底：加载区隐藏（无论成功与否，避免一直转圈）
+        // 先挂载、后设 src：Ruffle 0.6 要求元素已连接到 DOM 才会触发加载，
+        // 顺序颠倒会导致播放器一直留在 DOM 之外，表现就是纯黑屏。
         fc.appendChild(player);
-        // 若 12 秒仍未触发任何事件，先隐藏加载转圈（游戏可能已开始）
-        setTimeout(() => { document.getElementById("loading").style.display = "none"; }, 12000);
+        player.src = url;
+        // 这里不再设置无条件定时器隐藏加载态：58.9MB / 65.9MB 的 Flash 包
+        // 远不会在 12 秒内下载完，提前隐藏只会让用户盯着黑屏却没有任何提示。
       } else if (game.type === "h5") {
         hint.style.display = "block";
         hint.innerHTML = `提示：H5 游戏为网页版，若卡在加载请刷新页面。`;
