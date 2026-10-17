@@ -250,7 +250,7 @@ function cnParts(now) {
     // 次日 00:00(UTC+8) 的 epoch ms：用 Date.UTC 处理月末/跨年进位，再减 8 小时回落
     nextDay: Date.UTC(cn.getUTCFullYear(), cn.getUTCMonth(), cn.getUTCDate() + 1) - 8 * 3600 * 1000,
     // 下一个整点是绝对时刻，与时区无关
-    nextHour: Math.ceil(Date.now() / 3600000) * 3600000
+    nextHour: Math.ceil((now || Date.now()) / 3600000) * 3600000
   };
 }
 
@@ -281,6 +281,9 @@ function constEq(a, b) {
   let d = 0;
   for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return d === 0;
+}
+function clientIP(request) {
+  return request.headers.get("CF-Connecting-IP") || "unknown";
 }
 // 读 cookie。用 split 而不是正则：正则里拼 name 既没必要，也容易在特殊字符上出岔子。
 // decodeURIComponent 对非法百分号序列会抛错（例如手工构造 "ghub_gate=%"），
@@ -388,11 +391,6 @@ function cookieStr(name, value, maxAge) {
 }
 function clearCookieStr(name) {
   return `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
-}
-function readCookie(request, name) {
-  const c = request.headers.get("Cookie") || "";
-  const m = c.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"));
-  return m ? decodeURIComponent(m[1]) : "";
 }
 function bearerToken(request) {
   const h = request.headers.get("Authorization") || "";
@@ -759,6 +757,13 @@ export default {
           const id = newMsgId(now);
           const msg = { id, name: auth.username, avatar: auth.avatar || "", text, time: now };
           await env.MSG_KV.put("msg:" + id, JSON.stringify(msg), { expirationTtl: MSG_TTL });
+          // 列表有 15 秒边缘缓存，不主动失效的话「刚发出去的留言要等 15 秒才出现」，
+          // 用户会以为是发布失败然后重复发。这里把默认列表（无 limit 参数）的缓存删掉。
+          try {
+            ctx.waitUntil(caches.default.delete(new URL("/api/msg", url).toString()));
+          } catch (e) {
+            // 清不掉最多是旧列表多留 15 秒，不影响写入
+          }
           ctx.waitUntil(Promise.all([
             env.MSG_KV.put(uKey, String(uCount + 1), { expirationTtl: 900 }),
             env.MSG_KV.put(dKey, String(dCount + 1), { expirationTtl: 86400 })
