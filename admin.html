@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>站长看板 · games-hub</title>
+<meta name="theme-color" content="#0b0918">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23302b63'/%3E%3Cpath d='M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0' fill='none' stroke='#e0e7ff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg1:#0f0c29; --bg2:#302b63; --bg3:#24243e;
+  --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.1);
+  --txt:#fff; --sub:#b9c2e0; --dim:#8a92b8;
+  --accent:#c7d2fe; --accent2:#a5b4fc; --pink:#f0abfc; --danger:#fca5a5; --ok:#86efac;
+}
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(167,139,250,.16), transparent 60%),
+    radial-gradient(900px 460px at -10% 20%, rgba(147,197,253,.12), transparent 60%),
+    linear-gradient(135deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+  color: var(--txt); min-height: 100vh;
+}
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 218px; flex-shrink: 0; display: flex; flex-direction: column; gap: 26px;
+  padding: 22px 16px 20px; background: rgba(10,8,30,.85); backdrop-filter: blur(14px);
+  border-right: 1px solid var(--line); position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.logo { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; letter-spacing: 1px; padding: 0 6px; }
+.logo svg { width: 26px; height: 26px; flex-shrink: 0; }
+.snav { display: flex; flex-direction: column; gap: 8px; }
+.mnav {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  border: 1px solid transparent; background: transparent; color: var(--sub);
+  padding: 11px 14px; border-radius: 12px; font-size: 14px; cursor: pointer; text-decoration: none; transition: .15s;
+}
+.mnav svg { width: 18px; height: 18px; flex-shrink: 0; }
+.mnav:hover { color: var(--txt); background: rgba(255,255,255,.06); border-color: var(--line); }
+.mnav.on { background: linear-gradient(135deg, rgba(165,180,252,.22), rgba(124,58,237,.16)); color: var(--accent); border-color: rgba(165,180,252,.4); font-weight: 700; }
+.sidebar-foot { margin-top: auto; padding: 0 8px; font-size: 11.5px; color: #5b6287; line-height: 1.7; }
+.main { flex: 1; min-width: 0; }
+.container { max-width: 980px; margin: 0 auto; padding: 26px 22px 44px; }
+.page-head h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.page-head p { color: var(--dim); font-size: 13px; margin-top: 6px; }
+.sec { margin-top: 26px; }
+.sec > h2 { font-size: 16px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.sec > h2 .hint { font-size: 12px; font-weight: 400; color: var(--dim); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+}
+.stat .k { font-size: 12.5px; color: var(--dim); }
+.stat .v { font-size: 26px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: 12px; color: var(--sub); margin-top: 4px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.panel + .panel { margin-top: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { text-align: left; color: var(--dim); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+.badge {
+  display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  color: var(--pink); border: 1px solid rgba(240,171,252,.35); background: rgba(240,171,252,.14);
+}
+.badge.me { color: var(--ok); border-color: rgba(134,239,172,.35); background: rgba(134,239,172,.12); }
+.btn {
+  border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--txt);
+  padding: 6px 14px; border-radius: 9px; cursor: pointer; font-size: 12.5px; font-family: inherit; transition: .15s;
+}
+.btn:hover { border-color: var(--accent2); color: var(--accent); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #1e1b4b; font-weight: 700; }
+.btn.pri:hover { background: #dbe3ff; color: #1e1b4b; }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { border-color: rgba(252,165,165,.5); background: rgba(252,165,165,.08); }
+.btn.confirming { color: var(--danger); border-color: rgba(252,165,165,.5); background: rgba(252,165,165,.12); font-weight: 700; }
+.btn:disabled { opacity: .5; cursor: wait; }
+.state { text-align: center; padding: 40px 16px; color: var(--dim); font-size: 14px; }
+.rank { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.rank:last-child { border-bottom: 0; }
+.rank .no { width: 22px; text-align: center; color: var(--dim); font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.rank .bar-wrap { flex: 1; min-width: 0; }
+.rank .nm { font-size: 13.5px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank .bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.rank .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a5b4fc, #7c3aed); }
+.rank .n { color: var(--sub); font-size: 12.5px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.msg-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.msg-item:last-child { border-bottom: 0; }
+.msg-item .m-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.msg-item .m-name { font-weight: 700; font-size: 13.5px; }
+.msg-item .m-time { font-size: 11.5px; color: var(--dim); }
+.msg-item .m-text { font-size: 13.5px; color: var(--sub); margin-top: 3px; word-break: break-word; }
+.msg-item .m-acts { margin-top: 6px; display: flex; gap: 8px; }
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  background: #211d4e; border: 1px solid var(--line); color: var(--txt);
+  padding: 10px 18px; border-radius: 12px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  z-index: 99; max-width: calc(100% - 32px); text-align: center;
+}
+.empty { color: var(--dim); font-size: 13px; padding: 12px 0; }
+@media (max-width: 820px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: sticky; top: 0; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sidebar-foot { display: none; }
+  .snav { flex-direction: row; }
+  .mnav { padding: 9px 12px; }
+  .hide-sm { display: none; }
+}
+::selection { background: rgba(165,180,252,.35); color: #fff; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/></svg>
+      games-hub
+    </div>
+    <nav class="snav">
+      <a class="mnav" href="/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M9 13h.01M15 10h.01M18 13h.01"/></svg>
+        游戏中心
+      </a>
+      <a class="mnav" href="/guestbook">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        留言板
+      </a>
+      <a class="mnav" href="/ai-admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
+        AI 模型管理
+      </a>
+      <a class="mnav on" href="/admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        站长看板
+      </a>
+    </nav>
+    <div class="sidebar-foot">只有管理员能看到这页</div>
+  </aside>
+  <main class="main">
+    <div class="container">
+      <div class="page-head">
+        <h1>站长看板</h1>
+        <p>访问与游戏开局的走势、用户和留言的管理都在这里。数据每 5 分钟合并写入一次，刚发生的访问要等一会儿才出现。</p>
+      </div>
+      <div class="state" id="gate" style="display:none"></div>
+      <div id="dash" hidden>
+
+        <div class="sec">
+          <h2>近 14 天 <span class="hint">PV = 页面访问 · UV = 去重访客（按日估计）</span></h2>
+          <div class="cards" id="cards"></div>
+          <div class="panel" style="margin-top:12px" id="chart"></div>
+        </div>
+
+        <div class="sec">
+          <h2>热门游戏 <span class="hint">按近 14 天开局次数</span></h2>
+          <div class="panel" id="hot"></div>
+        </div>
+
+        <div class="sec">
+          <h2>用户 <span class="hint" id="userHint"></span></h2>
+          <div class="panel">
+            <table>
+              <thead><tr><th>用户名</th><th class="hide-sm">注册时间</th><th>角色</th><th>操作</th></tr></thead>
+              <tbody id="userRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="sec">
+          <h2>留言管理 <span class="hint">最近 50 条 · 置顶与删除和留言板一致</span></h2>
+          <div class="panel" id="msgs"><div class="state">加载中…</div></div>
+        </div>
+
+        <div class="sec">
+          <h2>维护</h2>
+          <div class="panel">
+            <div style="font-size:13.5px;color:var(--sub)" id="cleanupTxt">旧版留言数据存放在单个大键里，每次打开留言板都会白读一次。迁移完成后可以删掉它。</div>
+            <div style="margin-top:10px"><button class="btn danger" id="cleanupBtn">删除旧版留言键</button></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function getToken() { return localStorage.getItem("ghub_token") || ""; }
+function getUser() { try { return JSON.parse(localStorage.getItem("ghub_user") || "null"); } catch (e) { return null; } }
+let me = getUser();
+let GAMES = [];      // 游戏名映射
+let USERS = [];      // 用户列表缓存
+let CONFIRM = null;  // 两段式删除的按钮状态
+
+let toastTimer = null;
+function toast(msg) {
+  let el = document.getElementById("adToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "adToast"; el.className = "toast"; el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = msg; el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = "none"; }, 2600);
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+async function api(url, opts) {
+  const r = await fetch(url, Object.assign({}, opts, {
+    headers: Object.assign({ "Content-Type": "application/json", "Authorization": "Bearer " + getToken() }, (opts && opts.headers) || {})
+  }));
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  return { st: r.status, d };
+}
+function fmtDate(t) {
+  if (!t) return "—";
+  const d = new Date(t);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function ymdPretty(s) { return s ? s.slice(4, 6) + "-" + s.slice(6, 8) : s; }
+
+/* ---------- 统计 ---------- */
+function renderStats(data) {
+  const days = data.days || [];
+  const today = days.length ? days[days.length - 1] : { pv: 0, uv: 0 };
+  const yest = days.length > 1 ? days[days.length - 2] : null;
+  const playsTotal = Object.values(data.total && data.total.plays || {}).reduce((s, n) => s + n, 0);
+  const diff = yest ? (today.pv - yest.pv) : null;
+  document.getElementById("cards").innerHTML = [
+    ["今日 PV", today.pv, diff === null ? "" : (diff >= 0 ? "比昨天 +" + diff : "比昨天 " + diff)],
+    ["今日 UV", today.uv, yest ? "昨天 " + yest.uv : ""],
+    ["14 天 PV", (data.total && data.total.pv) || 0, "合计"],
+    ["14 天开局", playsTotal, "合计"]
+  ].map(c => `<div class="stat"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="d">${esc(c[2])}</div></div>`).join("");
+
+  // 柱状图（内联 SVG，纯静态，不引库）
+  const W = 720, H = 160, PAD = 26, BW = 26;
+  const max = Math.max(1, ...days.map(d => d.pv));
+  const step = days.length ? (W - PAD * 2) / days.length : 0;
+  let svg = `<svg viewBox="0 0 ${W} ${H + 30}" role="img" aria-label="近14天PV柱状图" style="width:100%;height:auto;display:block">`;
+  days.forEach((d, i) => {
+    const h = Math.round((d.pv / max) * (H - PAD * 2));
+    const x = PAD + i * step + (step - BW) / 2;
+    const y = H - PAD - h;
+    const last = i === days.length - 1;
+    svg += `<rect x="${x}" y="${y}" width="${BW}" height="${Math.max(h, 2)}" rx="5" fill="${last ? "#a5b4fc" : "rgba(165,180,252,.45)"}"><title>${d.ymd}：PV ${d.pv} · UV ${d.uv}</title></rect>`;
+    if (d.pv > 0) svg += `<text x="${x + BW / 2}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#b9c2e0">${d.pv}</text>`;
+    svg += `<text x="${x + BW / 2}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#8a92b8">${ymdPretty(d.ymd)}</text>`;
+  });
+  if (!days.length) svg += `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="13" fill="#8a92b8">还没有数据</text>`;
+  svg += "</svg>";
+  document.getElementById("chart").innerHTML = svg;
+
+  // 热门游戏
+  const plays = (data.total && data.total.plays) || {};
+  const rows = Object.entries(plays)
+    .map(([id, n]) => ({ id, n, name: (GAMES.find(g => g.id === id) || {}).name || id }))
+    .sort((a, b) => b.n - a.n);
+  const maxN = Math.max(1, ...rows.map(r => r.n));
+  document.getElementById("hot").innerHTML = rows.length
+    ? rows.map((r, i) => `<div class="rank">
+        <span class="no">${i + 1}</span>
+        <span class="bar-wrap"><span class="nm">${esc(r.name)}</span>
+        <span class="bar"><i style="width:${Math.round(r.n / maxN * 100)}%"></i></span></span>
+        <span class="n">${r.n} 次</span></div>`).join("")
+    : '<div class="empty">还没有开局记录。玩家进入游戏页会计一次开局。</div>';
+}
+
+/* ---------- 用户管理 ---------- */
+function renderUsers(meName) {
+  document.getElementById("userRows").innerHTML = USERS.map(u => {
+    const role = u.admin ? '<span class="badge">管理员</span>' : '<span style="color:var(--dim)">普通</span>';
+    const ops = [];
+    if (u.username !== meName) {
+      ops.push(`<button class="btn" data-uop="${u.admin ? "revoke" : "grant"}" data-name="${esc(u.username)}">${u.admin ? "撤管理员" : "设为管理员"}</button>`);
+      ops.push(`<button class="btn danger" data-uop="del" data-name="${esc(u.username)}">删除</button>`);
+    } else {
+      ops.push('<span class="badge me">我自己</span>');
+    }
+    return `<tr>
+      <td><b>${esc(u.username)}</b> ${u.avatar ? esc(u.avatar) : ""}</td>
+      <td class="hide-sm" style="color:var(--dim)">${fmtDate(u.created)}</td>
+      <td>${role}</td>
+      <td><div style="display:flex;gap:6px;flex-wrap:wrap">${ops.join("")}</div></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="4" class="empty">没有用户</td></tr>';
+  document.getElementById("userHint").textContent = "共 " + USERS.length + " 位";
+}
+
+document.getElementById("userRows").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-uop]");
+  if (!b) return;
+  const op = b.dataset.uop === "del" ? "delete" : b.dataset.uop;
+  const name = b.dataset.name;
+  // 删除是危险操作：两段式确认
+  if (b.dataset.uop === "del" && !b.classList.contains("confirming")) {
+    b.classList.add("confirming");
+    b.textContent = "确认删除？";
+    setTimeout(() => { b.classList.remove("confirming"); b.textContent = "删除"; }, 3000);
+    return;
+  }
+  b.disabled = true;
+  const { st, d } = await api("/api/admin/users", { method: "POST", body: JSON.stringify({ op, username: name }) });
+  b.disabled = false;
+  if (d.ok) {
+    toast(b.dataset.uop === "del" ? "已删除 " + name : "已更新 " + name + " 的权限");
+    loadUsers();
+  } else {
+    toast(d.error || "操作失败");
+    if (st === 401) location.href = "/login?next=/admin";
+  }
+});
+
+async function loadUsers() {
+  const { st, d } = await api("/api/admin/users");
+  if (d.ok) { USERS = d.users || []; renderUsers(d.me); }
+  else toast(d.error || "用户列表加载失败");
+}
+
+/* ---------- 留言管理 ---------- */
+function renderMsgs(list) {
+  document.getElementById("msgs").innerHTML = list.length
+    ? list.map(m => `<div class="msg-item">
+        <div class="m-head">
+          <span class="m-name">${esc(m.name)}</span>
+          ${m.pinned ? '<span class="badge">置顶</span>' : ""}
+          <span class="m-time">${m.replies ? m.replies.length + " 回复 · " : ""}${m.likes ? m.likes + " 赞 · " : ""}${fmtDate(m.time)}</span>
+        </div>
+        <div class="m-text">${esc(m.text)}</div>
+        <div class="m-acts">
+          <button class="btn" data-mop="pin" data-id="${esc(m.id)}" data-pin="${m.pinned ? "1" : "0"}">${m.pinned ? "取消置顶" : "置顶"}</button>
+          <button class="btn danger" data-mop="del" data-id="${esc(m.id)}">删除</button>
+        </div>
+      </div>`).join("")
+    : '<div class="empty">还没有留言</div>';
+}
+
+document.getElementById("msgs").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-mop]");
+  if (!b) return;
+  b.disabled = true;
+  let res;
+  if (b.dataset.mop === "pin") {
+    res = await api("/api/msg/pin", { method: "POST", body: JSON.stringify({ id: b.dataset.id, pin: b.dataset.pin !== "1" }) });
+  } else {
+    res = await api("/api/msg?id=" + encodeURIComponent(b.dataset.id), { method: "DELETE" });
+  }
+  b.disabled = false;
+  if (res.d.ok) loadMsgs();
+  else toast(res.d.error || "操作失败");
+});
+
+async function loadMsgs() {
+  const { d } = await api("/api/msg?limit=50");
+  renderMsgs(Array.isArray(d) ? d : []);
+}
+
+/* ---------- 维护 ---------- */
+document.getElementById("cleanupBtn").addEventListener("click", async (e) => {
+  const b = e.currentTarget;
+  if (!b.classList.contains("confirming")) {
+    b.classList.add("confirming");
+    b.textContent = "确认删除？";
+    setTimeout(() => { b.classList.remove("confirming"); b.textContent = "删除旧版留言键"; }, 3000);
+    return;
+  }
+  b.disabled = true;
+  const { st, d } = await api("/api/admin/cleanup", { method: "POST" });
+  b.disabled = false;
+  b.classList.remove("confirming");
+  b.textContent = "删除旧版留言键";
+  if (d.ok) {
+    document.getElementById("cleanupTxt").textContent = d.deleted
+      ? "已删除旧版留言键。之后留言板少一次无效读取。"
+      : "旧键不存在，无需清理。";
+    toast(d.deleted ? "已清理" : "无需清理");
+  } else toast(d.error || "清理失败");
+});
+
+/* ---------- 入口 ---------- */
+(async function init() {
+  if (!(me && me.username)) { location.href = "/login?next=/admin"; return; }
+  // 先拿游戏名单（热门排行的名称映射要用），再拉统计数据
+  try { GAMES = await (await fetch("/api/games")).json(); } catch (e) { GAMES = []; }
+  const { st, d } = await api("/api/stats");
+  if (st === 403) {
+    document.getElementById("gate").style.display = "block";
+    document.getElementById("gate").textContent = "这个页面只有管理员能看。";
+    return;
+  }
+  if (!d.ok) { toast(d.error || "统计数据加载失败"); return; }
+  document.getElementById("dash").hidden = false;
+  renderStats(d);
+  loadUsers();
+  loadMsgs();
+  // 心跳：看板页自己也算一次访问
+  try { navigator.sendBeacon && navigator.sendBeacon("/api/stats", new Blob(['{}'], { type: "application/json" })); } catch (e) {}
+})();
+</script>
+</body>
+</html>

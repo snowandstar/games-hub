@@ -42,6 +42,7 @@ const PAGES = [
   "tools.html",
   "media.html",
   "guestbook.html",
+  "admin.html",
   "game2048.html",
   "minesweeper.html",
   "snake.html",

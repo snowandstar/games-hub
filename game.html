@@ -163,6 +163,8 @@ function boot() {
         });
         localStorage.setItem(RK, JSON.stringify(rl.slice(0, 6)));
       } catch (e) { /* 隐私模式忽略 */ }
+      // 站长看板：记一次开局（fire-and-forget，失败无所谓；cookie 会带上，服务端认门禁）
+      try { fetch("/api/stats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ play: game.id }), keepalive: true }); } catch (e) {}
       document.getElementById("gameTitle").textContent = game.name;
       document.title = game.name + " | 游戏中心";
       const tag = document.getElementById("typeTag");

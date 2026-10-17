@@ -380,7 +380,7 @@ async function verifyGate(value, env) {
 // 1) 首页两个形式；2) 白名单页面（正则有右边界，见 fetch 内注释）；
 // 3) 排除带非 html 扩展名的静态资源（.json/.svg/.jpg/.swf…）——注意不能一刀切排除所有带扩展名的
 //    路径，否则 /minecraft.html 这种真页面会被绕过，门禁直接失效。
-const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin)(?:[\/\?#.]|$)/;
+const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin|admin)(?:[\/\?#.]|$)/;
 const GATE_STATIC_EXT_RE = /\.(?!html?$)[a-z0-9]{1,8}$/i;
 function needsGate(path) {
   if (path === "/" || path === "/index.html") return true;
@@ -432,6 +432,62 @@ async function recordFail(env, ip) {
 }
 async function clearFail(env, ip) {
   await env.MSG_KV.delete("fail:" + ip);
+}
+
+// ---------- 站长看板：访问统计（内存攒批 + 合并写入） ----------
+// KV 免费写额度 1000 次/天，逐 PV 一写半天就打满，所以统计必须在 isolate 内存里攒批：
+// 攒满 5 分钟才 read-modify-write 合并写回一个日键（stat:d:<ymd>）。
+// 代价与边界（如实写，不假装精确）：
+//   1) isolate 被回收时没攒满 5 分钟的那一小批会丢——看板是趋势参考，不是精确账本；
+//   2) 多 isolate 并发 flush 时 KV 最终一致，可能互相覆盖丢一点计数；
+//   3) UV 用「当日 + IP 的 SHA-256 前 12 位」估计，不跨天去重，也不是严格意义上的用户数。
+const STAT_FLUSH_MS = 5 * 60 * 1000;
+const STAT_TTL_SEC = 90 * 86400; // 日键保留 90 天，靠 TTL 自动清，不占删除额度
+const STAT_UV_CAP = 1000;        // 每日 UV 哈希集合上限，防止日键无限膨胀
+const STAT_READ_DAYS = 14;       // 看板一次读最近 14 天
+let statBuf = null;              // { ymd, pv, uv:[哈希], plays:{游戏id:次数} }
+let statFlushAt = 0;
+
+async function statIpHash(ip, ymd) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip + "|" + ymd));
+  return [...new Uint8Array(d).slice(0, 6)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function statFlush(env) {
+  const buf = statBuf;
+  if (!buf) return;
+  statBuf = null;
+  statFlushAt = 0;
+  const key = "stat:d:" + buf.ymd;
+  const cur = (await env.MSG_KV.get(key, "json")) || { pv: 0, uv: [], plays: {} };
+  cur.pv = (parseInt(cur.pv, 10) || 0) + buf.pv;
+  const seen = new Set(Array.isArray(cur.uv) ? cur.uv : []);
+  for (const h of buf.uv) {
+    if (seen.size >= STAT_UV_CAP) break;
+    seen.add(h);
+  }
+  cur.uv = [...seen];
+  cur.plays = cur.plays && typeof cur.plays === "object" ? cur.plays : {};
+  for (const [id, n] of Object.entries(buf.plays)) {
+    cur.plays[id] = (parseInt(cur.plays[id], 10) || 0) + n;
+  }
+  await env.MSG_KV.put(key, JSON.stringify(cur), { expirationTtl: STAT_TTL_SEC });
+}
+
+async function statRecord(env, ctx, ip, play) {
+  const p = cnParts(Date.now());
+  if (!statBuf || statBuf.ymd !== p.ymd) {
+    statBuf = { ymd: p.ymd, pv: 0, uv: [], plays: {} };
+    statFlushAt = Date.now();
+  }
+  statBuf.pv += 1;
+  statBuf.uv.push(await statIpHash(ip, p.ymd));
+  if (play) statBuf.plays[play] = (statBuf.plays[play] || 0) + 1;
+  if (Date.now() - statFlushAt >= STAT_FLUSH_MS) {
+    // 先推进时间戳再写：flush 失败时不要让后续每个请求都反复重试
+    statFlushAt = Date.now();
+    ctx.waitUntil(statFlush(env).catch(() => {}));
+  }
 }
 
 export default {
@@ -795,6 +851,9 @@ export default {
           const body = await request.json();
           const text = String(body.text || "").trim().slice(0, 500);
           if (!text) return json({ error: "留言内容不能为空", code: "empty_text" }, 400);
+          // now 必须在回复分支之前声明：replyTo 分支的 newMsgId(now)/time:now 都要用它，
+          // 声明放后面会踩 TDZ（一回复就 ReferenceError → 500）
+          const now = Date.now();
           // 回复模式：带 replyTo 就是楼中楼回复，正文上限收到 200 字
           const replyTo = String(body.replyTo || "").trim();
           if (replyTo) {
@@ -815,7 +874,6 @@ export default {
           }
           // 限流：同一用户 10 分钟 8 条、全站 200 条/天。
           // 计数键靠 TTL 自动过期，不用 delete（delete 也占 KV 免费写额度）。
-          const now = Date.now();
           const p = cnParts(now);
           const uKey = "msgq:u:" + auth.username + ":" + Math.floor(now / MSG_RATE_USER_WIN);
           const dKey = "msgq:all:" + p.ymd;
@@ -927,6 +985,112 @@ export default {
         ctx.waitUntil(caches.default.delete(new URL("/api/msg", url).toString()));
       } catch (e) { /* 缓存清不掉最多晚 15 秒 */ }
       return json({ ok: true, pinned: pin });
+    }
+
+    // ---------- 站长看板 ----------
+    // 心跳：页面都在门禁后面，只有带有效门禁 cookie 的心跳才计数（HMAC 校验，0 次 KV 读）。
+    // 响应体固定 {ok:true}，不给任何数据，避免被当成探测接口。
+    if (path === "/api/stats" && request.method === "POST") {
+      const g = await verifyGate(readCookie(request, "ghub_gate"), env);
+      if (g) {
+        let body = {};
+        try { body = await request.json(); } catch (e) {}
+        let play = String(body && body.play || "").slice(0, 40);
+        if (play) {
+          try {
+            const games = await loadGames(url, env);
+            // 不在游戏表里的 id 一律不记，防止拿垃圾字符串灌统计键
+            if (!games.some(x => x.id === play)) play = "";
+          } catch (e) { play = ""; }
+        }
+        ctx.waitUntil(statRecord(env, ctx, clientIP(request), play).catch(() => {}));
+      }
+      return json({ ok: true });
+    }
+    // 看板数据（管理员）：最近 14 天的 PV / UV / 游戏开局数
+    if (path === "/api/stats" && request.method === "GET") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+      const list = await env.MSG_KV.list({ prefix: "stat:d:" });
+      // KV.list 字典序 = ymd 升序，取尾部即可，不用自己排序
+      const keys = list.keys.map(k => k.name).sort().slice(-STAT_READ_DAYS);
+      const days = await Promise.all(keys.map(async k => {
+        const d = await env.MSG_KV.get(k, "json").catch(() => null);
+        return {
+          ymd: k.slice(7),
+          pv: parseInt(d && d.pv, 10) || 0,
+          uv: Array.isArray(d && d.uv) ? d.uv.length : 0,
+          plays: (d && d.plays && typeof d.plays === "object") ? d.plays : {}
+        };
+      }));
+      const total = { pv: 0, plays: {} };
+      for (const d of days) {
+        total.pv += d.pv;
+        for (const [id, n] of Object.entries(d.plays)) total.plays[id] = (total.plays[id] || 0) + n;
+      }
+      return json({ ok: true, days, total });
+    }
+    // 用户列表（管理员）
+    if (path === "/api/admin/users" && request.method === "GET") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+      const users = [];
+      let cursor;
+      do {
+        const page = await env.MSG_KV.list({ prefix: "user:", cursor });
+        for (const k of page.keys) {
+          const u = await env.MSG_KV.get(k.name, "json").catch(() => null);
+          if (u) users.push({ username: k.name.slice(5), admin: !!u.admin, created: u.created || 0, avatar: u.avatar || "" });
+        }
+        cursor = page.list_complete ? undefined : page.cursor;
+      } while (cursor);
+      users.sort((a, b) => (a.created || 0) - (b.created || 0));
+      return json({ ok: true, users, me: auth.username });
+    }
+    // 用户管理操作（管理员）：grant 授权 / revoke 撤权 / delete 删除
+    if (path === "/api/admin/users" && request.method === "POST") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+      let body = null;
+      try { body = await request.json(); } catch (e) {}
+      const op = String(body && body.op || "");
+      const target = String(body && body.username || "").trim();
+      if (!["grant", "revoke", "delete"].includes(op)) return json({ error: "未知操作", code: "bad_op" }, 400);
+      if (!target || target === auth.username) return json({ error: "不能对自己做这个操作", code: "self_forbidden" }, 400);
+      const rec = await env.MSG_KV.get("user:" + target, "json");
+      if (!rec) return json({ error: "用户不存在", code: "user_not_found" }, 404);
+      if (op === "grant" || op === "revoke") {
+        if (op === "revoke" && rec.admin) {
+          // 撤销前确认这不是最后一位管理员，否则看板会被锁死在外面
+          let cursor;
+          let admins = 0;
+          do {
+            const page = await env.MSG_KV.list({ prefix: "user:", cursor });
+            for (const k of page.keys) {
+              const u = await env.MSG_KV.get(k.name, "json").catch(() => null);
+              if (u && u.admin) admins += 1;
+            }
+            cursor = page.list_complete ? undefined : page.cursor;
+          } while (cursor);
+          if (admins <= 1) return json({ error: "这是最后一位管理员，不能撤销", code: "last_admin" }, 400);
+        }
+        rec.admin = op === "grant";
+        await env.MSG_KV.put("user:" + target, JSON.stringify(rec));
+        return json({ ok: true, admin: rec.admin });
+      }
+      // delete：删掉 user: 记录后 getAuth() 对该用户全部会话返回 null，会话即刻失效，
+      // 不需要（也无法）枚举随机 token 的 sess: 键
+      await env.MSG_KV.delete("user:" + target);
+      return json({ ok: true, deleted: true });
+    }
+    // 维护：删除旧版留言单键 msgs（迁移完成后遗留，每次 GET /api/msg 都会白读一次）
+    if (path === "/api/admin/cleanup" && request.method === "POST") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403);
+      const legacy = await env.MSG_KV.get("msgs", "json");
+      if (legacy === null) return json({ ok: true, deleted: false, note: "旧键不存在，无需清理" });
+      await env.MSG_KV.delete("msgs");
+      return json({ ok: true, deleted: true });
     }
 
     // ===== AI 助手：预设模型管理与聊天代理（CORS 允许妙搭应用调用）=====
@@ -1074,6 +1238,7 @@ const KNOWN_PAGE_PATHS = new Set([
   "/guestbook", "/guestbook.html",
   "/account", "/account.html",
   "/ai-admin", "/ai-admin.html",
+  "/admin", "/admin.html",
   "/game", "/game.html",
   "/game2048", "/game2048.html",
   "/minesweeper", "/minesweeper.html",

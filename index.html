@@ -1719,6 +1719,8 @@ ul,ol{ padding: 0; list-style: none; }
   window.addEventListener("hashchange", applyHash);
 
   /* ---------------- PWA：service worker ---------------- */
+  // 站长看板心跳：记一次 PV。fire-and-forget，同源默认带 cookie，服务端认门禁后才计数。
+  try { fetch("/api/stats", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", keepalive: true }); } catch (e) {}
   // 只在安全上下文注册（生产 https / 本地 localhost）。
   // SW 缓存策略见 sw.js：不碰 /api、不缓存带账号数据的页面，断网时只兜三款纯静态小游戏。
   if ("serviceWorker" in navigator &&
