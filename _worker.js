@@ -962,7 +962,9 @@ function withNoindex(resp) {
 
 // 真 404 响应：优先返回 /404.html 的内容；取不到（或该文件尚未创建、
 // 又被回落成首页）则返回纯文本，绝不抛异常。
-async function notFoundResponse(url, env, fallbackBody) {
+// isSelf：请求的正是 /404.html 本身，此时 fallbackBody 就是 404 页内容，
+// 不能再拿它做"是否被回落"的比对（必然相等，会误判成文件不存在）。
+async function notFoundResponse(url, env, fallbackBody, isSelf) {
   let body = "404 Not Found";
   let type = "text/plain; charset=utf-8";
   try {
@@ -970,7 +972,7 @@ async function notFoundResponse(url, env, fallbackBody) {
     if (nf.ok && (nf.headers.get("Content-Type") || "").includes("text/html")) {
       const html = await nf.text();
       // 与回落内容完全一致 => /404.html 也不存在，Pages 又把它回落成了首页
-      if (html && html !== fallbackBody) {
+      if (html && (isSelf || html !== fallbackBody)) {
         body = html;
         type = "text/html; charset=utf-8";
       }
@@ -1003,7 +1005,7 @@ async function serveAsset(request, env, path) {
   // 因此：路径不在已知页面集合内 且 仍返回 200 + HTML => 就是 Pages 回落首页，改判真 404。
   // （/robots.txt、/404.html 若文件不存在，同样会回落，这里一并按 404 处理，避免软 404。）
   if (resp.status === 200 && !KNOWN_PAGE_PATHS.has(path)) {
-    return notFoundResponse(new URL(request.url), env, body);
+    return notFoundResponse(new URL(request.url), env, body, path === "/404.html");
   }
 
   return new Response(body, { status: resp.status, statusText: resp.statusText, headers: withNoindex(resp) });
