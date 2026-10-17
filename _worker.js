@@ -84,9 +84,42 @@ const ASSET_IDS = {
   "bh33.swf": 629342897
 };
 
+// CSP（折中版，先 Report-Only）。全站大量内联 <style>/<script>，Ruffle 还要 WASM 与 blob worker，
+// 严格 CSP 一上就白屏，所以每条非常规指令都是有具体理由才加的：
+//   'unsafe-inline'(script/style)  —— 每个页面都是内联 CSS + 内联 JS（首页 CSS/JS 全内联）
+//                                     少了直接白屏
+//   'wasm-unsafe-eval'             —— Ruffle 0.6 用 WebAssembly 跑 SWF，少了所有 Flash 页黑屏
+//   worker-src blob:               —— Ruffle 用 blob worker
+//   cdn.jsdelivr.net(script/connect)
+//                                  —— game.html 拉 ruffle.js、tools.html 拉 qrcodejs/marked，
+//                                     Ruffle 运行时还要从同一个 CDN 拉 .wasm
+//   frame-src 4m8dv3g0c7b16.doubao.link
+//                                  —— 首页/AI 助手是妙搭的跨站 iframe，少了 AI 面板空白
+//   connect-src https:             —— 用户自带 Key 的模式下 API 地址由用户填，无法穷举白名单
+// 转正路径（不要一步上正式）：
+//   1) 先用 Content-Security-Policy-Report-Only 跑 24 小时，看控制台/上报里的违规；
+//   2) 人工验四个场景：Flash 页 /game?id=、AI iframe(/ai-admin)、工具箱 /tools、4 个 minecraft 大包；
+//   3) 全绿后再把同样的值换到 Content-Security-Policy 头（只改头名，值不动）。
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' https:",
+  "worker-src 'self' blob:",
+  "frame-src 'self' https://4m8dv3g0c7b16.doubao.link",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'"
+].join("; ");
+
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "same-origin"
+  "Referrer-Policy": "same-origin",
+  "Content-Security-Policy-Report-Only": CSP_REPORT_ONLY
 };
 
 // AI 助手应用（妙搭 iframe）跨域调用站点 API 所需的 CORS 头
@@ -918,6 +951,7 @@ function withNoindex(resp) {
   h.set("X-Robots-Tag", "noindex, nofollow");
   h.set("X-Content-Type-Options", "nosniff");
   h.set("Referrer-Policy", "same-origin");
+  h.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return h;
 }
 
