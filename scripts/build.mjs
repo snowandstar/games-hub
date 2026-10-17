@@ -5,12 +5,15 @@
  * 用法：node scripts/build.mjs
  * 产出：dist/（Pages 的 Output directory）
  *
- * 只做五件事，不做别的：
+ * 只做四件事，不做别的：
  *   1. 校验 games.json（不合法就非零退出，不自动修复）
- *   2. 生成首页卡片，注入 index.html 的 <!--@build:game-cards-->
- *   3. 注入 <script type="application/json" id="gamesData">，客户端不再 fetch('/api/games')
- *   4. 构建期算好计数条（共 N 款 / Flash N / H5 N）写进 HTML
- *   5. 白名单拷贝到 dist/；4 个大包只改 <head> 元信息，流式处理
+ *   2. 按 group 分组生成首页卡片，注入 index.html 的三处
+ *      <!--@build:cards:mc--> / :flash--> / :quick-->
+ *   3. 构建期算好首屏数字条与三个区块的计数徽章，写进 HTML
+ *   4. 白名单拷贝到 dist/；4 个大包只改 <head> 元信息，流式处理
+ *
+ * 首页是纯静态结构（卡片在 HTML 里），不发 /api/games，没有骨架屏那一轮。
+ * 占位符缺失即构建失败——宁可部署不了，也不要上线一个空首页。
  *
  * 源目录解析规则：同名文件先找 spec §8 的分层目录（src/ bundles/ data/），
  * 找不到再退回仓库根目录。目录重构前后都能跑。
@@ -78,7 +81,7 @@ const BUNDLE_META = {
 
 // 卡片封面图固有尺寸，写进 width/height 防 CLS
 const IMG_SIZE = {
-  "/default.svg": [400, 300],
+  "/default.svg": [64, 64],
   "/bh32.jpg": [72, 72],
   "/bh33.jpg": [72, 72]
 };
@@ -90,11 +93,21 @@ const SUB_FALLBACK = {
   h5: "H5 · 点开即玩"
 };
 
+// 首页三个游戏区块（顺序即页面顺序）
+const GROUPS = [
+  { key: "mc", title: "我的世界网页版" },
+  { key: "flash", title: "Flash 怀旧" },
+  { key: "quick", title: "随手就能玩" }
+];
+const GROUP_KEYS = GROUPS.map((g) => g.key);
+
 const HEAD_SCAN = 8192;       // 只读大包前 8KB 做元信息清理
 const BUNDLE_MAX_DELTA = 2048; // 清理后体积变化上限，超出即中止
 
-const CARDS_PLACEHOLDER = "<!--@build:game-cards-->";
-const COUNTS_PLACEHOLDER = "<!--@build:counts-->";
+const cardsPlaceholder = (k) => `<!--@build:cards:${k}-->`;
+const countPlaceholder = (k) => `<!--@build:count:${k}-->`;
+const METRICS_PLACEHOLDER = "<!--@build:metrics-->";
+const UPDATED_PLACEHOLDER = "<!--@build:updated-->";
 
 // ---------------------------------------------------------------- 小工具
 
@@ -197,6 +210,16 @@ function validateGames(raw) {
     if (g.type !== "flash" && g.type !== "h5") {
       errors.push(`[${i}].type：必须是 "flash" 或 "h5"，实际 ${JSON.stringify(g.type)}`);
     }
+    // group：决定这张卡进首页哪个区块
+    if (!GROUP_KEYS.includes(g.group)) {
+      errors.push(
+        `[${i}].group：必须是 ${GROUP_KEYS.map((k) => `"${k}"`).join(" / ")}，实际 ${JSON.stringify(g.group)}`
+      );
+    }
+    // desc：卡片第二行，缺省会退成类型兜底（不报错，但会提示）
+    if (g.desc !== undefined && (typeof g.desc !== "string" || !g.desc.trim())) {
+      errors.push(`[${i}].desc：必须是非空字符串（不填就走类型兜底），实际 ${JSON.stringify(g.desc)}`);
+    }
     // size：数字或缺失
     if (g.size !== undefined && g.size !== null) {
       if (typeof g.size !== "number" || !Number.isFinite(g.size)) {
@@ -220,6 +243,17 @@ function validateGames(raw) {
 
 // ---------------------------------------------------------------- 2. 生成卡片
 
+/** 7 张封面都用 default.svg 会一模一样，取名字里的版本号做叠字 */
+function tagOf(g) {
+  if ((g.icon || "/default.svg") !== "/default.svg") return "";
+  const name = String(g.name || "").trim();
+  if (/classic/i.test(name)) return "Classic";
+  const m = /([\d.]+)\s*$/.exec(name);
+  if (!m) return "";
+  const tag = m[1].replace(/\.+$/, "");
+  return tag.length >= 2 ? tag : "";
+}
+
 function cardHtml(g) {
   const type = esc(g.type);
   const name = esc(g.name);
@@ -227,132 +261,98 @@ function cardHtml(g) {
   const [w, h] = IMG_SIZE[g.icon] || IMG_SIZE_FALLBACK;
   const href = g.url || "/game.html?id=" + encodeURIComponent(g.id);
   const sub = esc(g.desc || SUB_FALLBACK[g.type] || "");
+  const tag = tagOf(g);
+  // 有 cover 字段说明备了 16:10 截图，走 cover--shot；否则按图标处理
+  const coverMod = g.cover ? "cover cover--shot" : "cover cover--icon";
+  const tagAttr = tag ? ` data-tag="${esc(tag)}"` : "";
+  const shotIdx = g.cover ? ` srcset="${esc(g.cover)}"` : "";
 
   return `<li data-type="${type}">
-        <a class="card ${type}" href="${esc(href)}">
-          <div class="cover"><img src="${icon}" alt="${name}" loading="lazy" width="${w}" height="${h}"></div>
-          <div class="info">
-            <h3>${name}</h3>
-            <p class="sub">${sub}</p>
-            <div class="meta">
-              <span class="size">${esc(fmtSize(g.size))}</span>
-              <span class="play">开始游戏 →</span>
-            </div>
-          </div>
-        </a>
-      </li>`;
+          <a class="card" href="${esc(href)}">
+            <span class="${coverMod}"${tagAttr}><img src="${icon}"${shotIdx} alt="" width="${w}" height="${h}" loading="lazy"></span>
+            <span class="info">
+              <span class="card-title">${name}</span>
+              <span class="card-desc">${sub}</span>
+              <span class="card-meta">
+                <span class="card-size">${esc(fmtSize(g.size))}</span>
+                <span class="card-go">开玩 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+              </span>
+            </span>
+          </a>
+        </li>`;
 }
 
-// ---------------------------------------------------------------- 3/4. 注入 index.html
+// ---------------------------------------------------------------- 3. 数字条与计数
 
-function buildIndex(template, games, srcRel) {
-  const cards = games.map(cardHtml).join("\n      ");
+function metricsHtml(games) {
   const flash = games.filter((g) => g.type === "flash").length;
   const h5 = games.filter((g) => g.type === "h5").length;
-  const countsHtml =
-    `<span class="pill">共 <b>${games.length}</b> 款</span>\n` +
-    `          <span class="pill">Flash <b>${flash}</b></span>\n` +
-    `          <span class="pill">H5 <b>${h5}</b></span>`;
+  const maxGame = games.reduce((a, b) => ((b.size || 0) > (a.size || 0) ? b : a), games[0]);
+  const items = [
+    [String(games.length), "款游戏"],
+    [String(flash), "款 Flash"],
+    [String(h5), "款 H5"],
+    [maxGame && maxGame.size != null ? fmtSize(maxGame.size).replace(" ", "") : "—", "最大一款"]
+  ];
+  return items
+    .map(
+      ([num, label]) =>
+        `            <div class="metric"><span class="metric-num">${esc(num)}</span>` +
+        `<span class="metric-label">${label}</span></div>`
+    )
+    .join("\n");
+}
 
+// ---------------------------------------------------------------- 4. 注入 index.html
+
+function buildIndex(template, games, srcRel) {
   let out = template;
   const notes = [];
 
-  // --- 卡片 ---
-  if (out.includes(CARDS_PLACEHOLDER)) {
-    out = out.replace(CARDS_PLACEHOLDER, cards);
-    notes.push(`卡片注入：命中占位符 ${CARDS_PLACEHOLDER}`);
-  } else {
-    // 源里还没有占位符：退回到 #grid 空容器，并把它升级成 <ul>（<li> 不能直接放 <div>）
-    const re = /<div([^>]*\bid=["']grid["'][^>]*)>\s*<\/div>/i;
-    const m = re.exec(out);
-    if (!m) {
+  for (const grp of GROUPS) {
+    const list = games.filter((g) => g.group === grp.key);
+    if (!list.length) {
+      fail(`分组 "${grp.key}"（${grp.title}）没有任何游戏，首页会空一块`, "改 games.json 的 group 字段");
+    }
+
+    const ph = cardsPlaceholder(grp.key);
+    if (!out.includes(ph)) {
       fail(
-        `${srcRel} 里既没有 ${CARDS_PLACEHOLDER} 也没找到空的 <div id="grid">，` +
-          "无法注入卡片。请在 #grid 内放入占位符，或保留空的 #grid 容器。"
+        `${srcRel} 里找不到占位符 ${ph}`,
+        `首页区块 "${grp.title}" 的 <ul> 内必须放这个占位符，否则卡片没有落点`
       );
     }
-    out = out.replace(re, `<ul$1>\n      ${cards}\n    </ul>`);
-    notes.push(`卡片注入：未找到占位符，已降级为替换空的 <div id="grid">（并升级为 <ul>）。` +
-      `建议后续在 ${srcRel} 的 #grid 内加上 ${CARDS_PLACEHOLDER}`);
-  }
+    out = out.replace(ph, list.map(cardHtml).join("\n        "));
+    notes.push(`卡片注入：${grp.title} → ${list.length} 张`);
 
-  // --- 计数条 ---
-  if (out.includes(COUNTS_PLACEHOLDER)) {
-    out = out.replace(COUNTS_PLACEHOLDER, countsHtml);
-    notes.push(`计数条注入：命中占位符 ${COUNTS_PLACEHOLDER}`);
-  } else {
-    const re = /<div([^>]*\bid=["']counts["'][^>]*)>\s*<\/div>/i;
-    if (re.test(out)) {
-      out = out.replace(re, `<div$1>${countsHtml}</div>`);
-      notes.push("计数条注入：未找到占位符，已降级为填充空的 #counts");
-    } else {
-      warn("未找到计数条容器 #counts，跳过计数注入（卡片数与计数可能不一致）");
+    const cph = countPlaceholder(grp.key);
+    if (!out.includes(cph)) {
+      fail(`${srcRel} 里找不到计数占位符 ${cph}`);
     }
+    out = out.replace(cph, `${list.length} 款`);
   }
 
-  // --- 副文案样式（源 CSS 里没有 .sub，构建期补一条，不动源码）---
-  if (out.includes("</style>")) {
-    out = out.replace(
-      "</style>",
-      "\n.info .sub { color: var(--sub); font-size: 12.5px; line-height: 1.5; margin: 0 0 6px; }\n</style>"
-    );
+  if (!out.includes(METRICS_PLACEHOLDER)) {
+    fail(`${srcRel} 里找不到首屏数字条占位符 ${METRICS_PLACEHOLDER}`);
   }
+  out = out.replace(METRICS_PLACEHOLDER, metricsHtml(games));
+  notes.push("首屏数字条：已按 games.json 计算（含最大一款的体积）");
 
-  // --- 关掉 fetch('/api/games')：卡片与数据已内联，不再需要骨架屏那一轮 ---
-  const json = JSON.stringify(games).replace(/</g, "\\u003c");
-  const loadRe = /^[ \t]*load\(\);[ \t]*$/m;
-  if (loadRe.test(out)) {
-    out = out.replace(loadRe, "// load() 由构建期移除：卡片与 #gamesData 已内联，不再 fetch('/api/games')");
-    notes.push("运行时：已移除 load() 调用，改为同步读 #gamesData");
+  const today = new Date().toISOString().slice(0, 10);
+  if (out.includes(UPDATED_PLACEHOLDER)) {
+    out = out.replace(UPDATED_PLACEHOLDER, today);
+    notes.push(`页脚最后更新：${today}`);
   } else {
-    warn("未找到独立的 load(); 调用，页面仍会 fetch('/api/games')（骨架屏会闪一下）");
+    warn(`未找到 ${UPDATED_PLACEHOLDER}，页脚"最后更新"留原样`);
   }
 
-  // 源码里的运行时模板仍带 role="listitem"，且 render() 会用 innerHTML 把构建好的 <li> 冲掉。
-  // 两处都在产物里改（源码不动）：去掉 listitem 角色，并把 render() 换成显隐过滤。
-  const listItemRe = / href="\$\{href\}" role="listitem">/;
-  if (listItemRe.test(out)) {
-    out = out.replace(listItemRe, ' href="${href}">');
-    notes.push('运行时：<a> 上的 role="listitem" 已移除（卡片语义交给 <ul>/<li>）');
-  } else {
-    warn('未找到 href="${href}" role="listitem">，无法移除 <a> 上的 role="listitem"');
+  // 注入完还有占位符残留，说明拼错了名字
+  const leftover = out.match(/<!--@build:[^>]*-->/g);
+  if (leftover) {
+    fail(`注入后仍有占位符残留：${[...new Set(leftover)].join(" ")}`);
   }
 
-  const inject =
-    `<script type="application/json" id="gamesData">${json}</script>\n` +
-    `<script>\n` +
-    `// 构建期注入：卡片与数据已在 HTML 里，不发请求、不出骨架屏\n` +
-    `(function () {\n` +
-    `  var el = document.getElementById("gamesData");\n` +
-    `  var d = [];\n` +
-    `  try { d = JSON.parse(el.textContent || "[]"); } catch (e) { d = []; }\n` +
-    `  GAMES = Array.isArray(d) ? d : [];\n` +
-    `  // 覆盖 render()：卡片不再重绘，只按类型显隐，避免 innerHTML 冲掉构建好的 <li>\n` +
-    `  render = function () {\n` +
-    `    var items = document.querySelectorAll("#grid > li"), shown = 0, i, ok;\n` +
-    `    for (i = 0; i < items.length; i++) {\n` +
-    `      ok = (curFilter === "all" || items[i].getAttribute("data-type") === curFilter);\n` +
-    `      items[i].style.display = ok ? "" : "none";\n` +
-    `      if (ok) shown++;\n` +
-    `    }\n` +
-    `    var st = document.getElementById("state");\n` +
-    `    if (st) {\n` +
-    `      if (shown) { st.style.display = "none"; }\n` +
-    `      else {\n` +
-    `        st.style.display = "block";\n` +
-    `        if (!st.innerHTML) st.textContent = "暂无该类型的游戏";\n` +
-    `      }\n` +
-    `    }\n` +
-    `  };\n` +
-    `  render();\n` +
-    `})();\n` +
-    `</script>\n`;
-
-  const bodyIdx = out.lastIndexOf("</body>");
-  if (bodyIdx === -1) fail(`${srcRel} 里找不到 </body>，无法注入 #gamesData`);
-  out = out.slice(0, bodyIdx) + inject + out.slice(bodyIdx);
-
-  return { html: out, notes, counts: { total: games.length, flash, h5 } };
+  return { html: out, notes, counts: { total: games.length } };
 }
 
 // ---------------------------------------------------------------- 5a. 大包 <head> 清理
@@ -503,7 +503,7 @@ async function main() {
   await writeFile(path.join(DIST, "index.html"), indexHtml, "utf8");
   log(`index.html: ${indexRel} → dist/index.html`);
   for (const n of notes) log("  · " + n);
-  log(`  · 计数条：共 ${counts.total} 款 / Flash ${counts.flash} / H5 ${counts.h5}`);
+  log(`  · 分组：${GROUPS.map((g) => `${g.title} ${games.filter((x) => x.group === g.key).length} 款`).join(" / ")}`);
 
   // --- 其余白名单文件 ---
   const copied = [];

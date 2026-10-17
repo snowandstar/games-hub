@@ -3,7 +3,9 @@
     "id": "minecraft-188",
     "name": "我的世界 1.8.8",
     "type": "h5",
+    "group": "mc",
     "size": 14.4,
+    "desc": "1.8 老版本，单人开世界，存档在本机",
     "icon": "/default.svg",
     "url": "/minecraft.html"
   },
@@ -11,7 +13,9 @@
     "id": "minecraft-1122",
     "name": "我的世界 1.12.2",
     "type": "h5",
+    "group": "mc",
     "size": 19.2,
+    "desc": "方块和生物最多的一版，加载也最久",
     "icon": "/default.svg",
     "url": "/minecraft-1122.html"
   },
@@ -19,7 +23,9 @@
     "id": "minecraft-125",
     "name": "我的世界 1.2.5",
     "type": "h5",
+    "group": "mc",
     "size": 6,
+    "desc": "6MB，早期版本，浏览器直接开",
     "icon": "/default.svg",
     "url": "/minecraft-125.html"
   },
@@ -27,7 +33,9 @@
     "id": "minecraft-classic",
     "name": "我的世界 Classic 0.30",
     "type": "h5",
+    "group": "mc",
     "size": 3.6,
+    "desc": "3.6MB，版本最老，浏览器直接开",
     "icon": "/default.svg",
     "url": "/minecraft-classic.html"
   },
@@ -35,7 +43,9 @@
     "id": "bleshui-vs-huoYing-3.2",
     "name": "死神VS火影 3.2",
     "type": "flash",
+    "group": "flash",
     "size": 58.9,
+    "desc": "经典 2D 格斗，选人开打",
     "icon": "/bh32.jpg",
     "swf": "/swf/bh32.swf"
   },
@@ -43,7 +53,9 @@
     "id": "bleshui-vs-huoYing-3.3",
     "name": "死神VS火影 3.3",
     "type": "flash",
+    "group": "flash",
     "size": 65.9,
+    "desc": "格斗续作，人物和招式比 3.2 多",
     "icon": "/bh33.jpg",
     "swf": "/swf/bh33.swf"
   },
@@ -51,6 +63,8 @@
     "id": "game2048",
     "name": "2048",
     "type": "h5",
+    "group": "quick",
+    "desc": "合数字到 2048，手机上能滑动",
     "icon": "/default.svg",
     "url": "/game2048.html"
   },
@@ -58,6 +72,8 @@
     "id": "minesweeper",
     "name": "扫雷",
     "type": "h5",
+    "group": "quick",
+    "desc": "三档难度，左键翻格右键标雷",
     "icon": "/default.svg",
     "url": "/minesweeper.html"
   },
@@ -65,6 +81,8 @@
     "id": "snake",
     "name": "贪吃蛇",
     "type": "h5",
+    "group": "quick",
+    "desc": "越吃越长，也越吃越快",
     "icon": "/default.svg",
     "url": "/snake.html"
   }

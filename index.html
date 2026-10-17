@@ -3,289 +3,834 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>games-hub | 游戏中心 · AI 助手</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0918">
+<title>游戏中心 · games-hub</title>
+<meta name="description" content="9 款游戏浏览器直接开玩：我的世界 4 个版本、死神VS火影 Flash 怀旧、2048、扫雷、贪吃蛇。最大的 65.9MB，第一次要等一下。">
+<meta property="og:title" content="游戏中心 · games-hub">
+<meta property="og:description" content="9 款游戏浏览器直接开玩：我的世界 4 个版本、死神VS火影 Flash 怀旧、2048、扫雷、贪吃蛇。最大的 65.9MB，第一次要等一下。">
+<meta property="og:locale" content="zh_CN">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23302b63'/%3E%3Cpath d='M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0' fill='none' stroke='%23e0e7ff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 30h6M52 30h6M26 40h-8v8M30 44h-8' stroke='%23c7d2fe' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='44' cy='40' r='3' fill='%23f0abfc'/%3E%3Ccircle cx='50' cy='44' r='2.2' fill='%2393c5fd'/%3E%3C/svg%3E">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg1:#0f0c29; --bg2:#302b63; --bg3:#24243e;
-  --card:rgba(255,255,255,.07); --card-hover:rgba(255,255,255,.12);
-  --line:rgba(255,255,255,.1); --txt:#fff; --sub:#b9c2e0; --dim:#8a92b8;
-  --accent:#c7d2fe; --accent2:#a5b4fc; --pink:#f0abfc; --blue:#93c5fd;
-}
-body {
-  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  background:
-    radial-gradient(1100px 500px at 85% -10%, rgba(167,139,250,.16), transparent 60%),
-    radial-gradient(900px 460px at -10% 20%, rgba(147,197,253,.12), transparent 60%),
-    linear-gradient(135deg, var(--bg1), var(--bg2) 55%, var(--bg3));
-  background-attachment: fixed;
-  color: var(--txt);
-  min-height: 100vh;
-}
-.layout { display: flex; min-height: 100vh; }
+/* ===========================================================
+   design tokens v1.0（唯一色值定义处，页面里不写裸值）
+   =========================================================== */
+:root{
+  color-scheme: dark;
 
-/* ===== 左侧导航栏 ===== */
-.sidebar {
-  width: 218px; flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 26px;
-  padding: 22px 16px 20px;
-  background: rgba(10,8,30,.85);
-  backdrop-filter: blur(14px);
-  border-right: 1px solid var(--line);
-  position: sticky; top: 0; height: 100vh; overflow-y: auto;
-}
-.logo { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; letter-spacing: 1px; padding: 0 6px; }
-.logo svg { width: 26px; height: 26px; flex-shrink: 0; }
-.logo .sub { color: var(--dim); font-size: 11.5px; font-weight: 400; letter-spacing: 0; }
-.snav { display: flex; flex-direction: column; gap: 8px; }
-.mnav {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; text-align: left;
-  border: 1px solid transparent; background: transparent; color: var(--sub);
-  padding: 11px 14px; border-radius: 12px; font-size: 14px; cursor: pointer; transition: .15s;
-}
-.mnav svg { width: 18px; height: 18px; flex-shrink: 0; }
-.mnav:hover { color: var(--txt); background: rgba(255,255,255,.06); border-color: var(--line); }
-.mnav.on {
-  background: linear-gradient(135deg, rgba(165,180,252,.22), rgba(124,58,237,.16));
-  color: var(--accent); border-color: rgba(165,180,252,.4); font-weight: 700;
-}
-.sidebar-foot { margin-top: auto; padding: 0 8px; font-size: 11.5px; color: #5b6287; line-height: 1.7; }
-.sidebar-foot a { color: var(--dim); text-decoration: none; }
-.sidebar-foot a:hover { color: var(--accent2); }
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+               "Liberation Mono", monospace;
 
-/* ===== 登录 / 账号 ===== */
-.user-box {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 4px; padding: 12px 6px 0; border-top: 1px solid var(--line);
-}
-.user-btn {
-  border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--sub);
-  padding: 7px 16px; border-radius: 10px; font-size: 13px; cursor: pointer; transition: .15s;
-}
-.user-btn:hover { color: var(--txt); border-color: var(--accent2); background: rgba(255,255,255,.14); }
-.user-btn.small { padding: 5px 12px; font-size: 12px; }
-.user-info { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.user-info .uname { font-size: 13px; font-weight: 700; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-info .uadmin { font-size: 11px; color: var(--pink); border: 1px solid rgba(240,171,252,.35); padding: 1px 7px; border-radius: 999px; flex-shrink: 0; }
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 999;
-  background: rgba(5,3,20,.72); backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center;
-}
-.modal {
-  width: min(92vw, 380px);
-  background: linear-gradient(165deg, #211d4e, #0f0c29);
-  border: 1px solid var(--line); border-radius: 18px; padding: 26px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.55);
-}
-.modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; letter-spacing: 1px; }
-.auth-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
-.auth-tab {
-  flex: 1; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--sub);
-  padding: 8px 0; border-radius: 10px; font-size: 13.5px; cursor: pointer; transition: .15s;
-}
-.auth-tab:hover { color: var(--txt); border-color: var(--accent2); }
-.auth-tab.on { background: var(--accent); color: #1e1b4b; border-color: var(--accent); font-weight: 700; }
-.modal input[type=text], .modal input[type=password] {
-  width: 100%; background: rgba(0,0,0,.35); border: 1px solid var(--line); color: var(--txt);
-  border-radius: 10px; padding: 11px 13px; font-size: 14px; outline: none; margin-bottom: 10px;
-}
-.modal input:focus { border-color: var(--accent2); }
-.auth-err { color: #fca5a5; font-size: 12.5px; min-height: 18px; margin: 2px 0 4px; }
-.btn-row { display: flex; gap: 10px; margin-top: 8px; }
-.btn {
-  border: 0; cursor: pointer; border-radius: 10px;
-  background: var(--accent); color: #1e1b4b; font-size: 14px; font-weight: 700;
-  padding: 11px 0; transition: .15s;
-}
-.btn:hover { background: #dbe3ff; }
-.btn:disabled { opacity: .55; cursor: wait; }
-.btn.ghost { background: rgba(255,255,255,.08); color: var(--txt); border: 1px solid var(--line); }
-.btn.ghost:hover { background: rgba(255,255,255,.14); }
-.auth-tip { text-align: center; font-size: 12px; color: var(--dim); margin-top: 12px; }
+  --fs-h1: 26px;
+  --fs-h2: 19px;
+  --fs-h3: 16px;
+  --fs-card: 15px;
+  --fs-body: 15px;
+  --fs-sm: 13px;
+  --fs-xs: 12px;
+  --fs-label: 11px;
+  --fs-metric: 20px;
 
-/* ===== 右侧内容 ===== */
-.main { flex: 1; min-width: 0; }
-.container { max-width: 1080px; margin: 0 auto; padding: 26px 22px 44px; }
+  --lh-h1: 1.25;
+  --lh-h2: 1.35;
+  --lh-h3: 1.45;
+  --lh-body: 1.75;
+  --lh-sm: 1.7;
+  --lh-xs: 1.6;
 
-/* ===== 游戏模块 ===== */
-#view-games { display: block; }
-.games-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.games-head h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
-.games-head .counts { display: inline-flex; gap: 8px; flex-wrap: wrap; }
-.counts .pill {
-  font-size: 12px; padding: 4px 12px; border-radius: 999px;
-  background: rgba(255,255,255,.08); border: 1px solid var(--line); color: var(--sub);
-}
-.counts .pill b { color: var(--accent); font-weight: 700; }
-.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.tab {
-  border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--sub);
-  padding: 6px 16px; border-radius: 999px; font-size: 13px; cursor: pointer; transition: .15s;
-}
-.tab:hover { color: var(--txt); border-color: var(--accent2); }
-.tab.on { background: var(--accent); color: #1e1b4b; border-color: var(--accent); font-weight: 700; }
-.tab .n { font-size: 11px; opacity: .7; margin-left: 4px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-.card {
-  display: block; text-decoration: none; color: inherit;
-  background: var(--card); border-radius: 16px; overflow: hidden; cursor: pointer;
-  border: 1px solid var(--line);
-  transition: transform .18s, box-shadow .18s, border-color .18s;
-  position: relative;
-}
-.card:hover, .card:focus-visible {
-  transform: translateY(-5px);
-  box-shadow: 0 14px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(165,180,252,.35);
-  border-color: rgba(165,180,252,.5);
-  outline: none;
-}
-.cover {
-  position: relative; width: 100%; aspect-ratio: 16/10; overflow: hidden;
-  background:
-    radial-gradient(160px 120px at 20% 15%, rgba(147,197,253,.25), transparent 70%),
-    radial-gradient(180px 130px at 85% 85%, rgba(240,171,252,.18), transparent 70%),
-    linear-gradient(140deg, #1e1b4b, #312e81 55%, #4338ca);
-  display: flex; align-items: center; justify-content: center;
-}
-.cover img { max-width: 62%; max-height: 78%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
-.badge-ver {
-  position: absolute; top: 10px; left: 10px;
-  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
-  background: rgba(0,0,0,.45); color: var(--accent); border: 1px solid rgba(199,212,254,.3);
-  backdrop-filter: blur(4px);
-}
-.badge-type {
-  position: absolute; bottom: 10px; right: 10px;
-  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
-  background: rgba(240,171,252,.16); color: var(--pink); border: 1px solid rgba(240,171,252,.35);
-  backdrop-filter: blur(4px);
-}
-.card.h5 .badge-type { background: rgba(147,197,253,.16); color: var(--blue); border-color: rgba(147,197,253,.35); }
-.info { padding: 13px 15px 15px; }
-.info h3 { font-size: 16px; margin-bottom: 4px; letter-spacing: .3px; }
-.info .meta { display: flex; justify-content: space-between; align-items: center; }
-.info .size { color: var(--dim); font-size: 12px; }
-.info .play {
-  font-size: 12px; color: var(--accent2); opacity: 0; transform: translateX(-4px);
-  transition: .18s;
-}
-.card:hover .play, .card:focus-visible .play { opacity: 1; transform: none; }
-.skeleton {
-  border-radius: 16px; border: 1px solid var(--line);
-  background: linear-gradient(100deg, rgba(255,255,255,.05) 40%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.05) 60%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-  aspect-ratio: 4/3;
-}
-@keyframes shimmer { to { background-position: -200% 0; } }
-.state { text-align: center; padding: 70px 20px; color: var(--dim); font-size: 14px; }
-.state button {
-  margin-top: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.08);
-  color: var(--txt); padding: 8px 22px; border-radius: 10px; cursor: pointer; font-size: 14px;
-}
-.state button:hover { background: rgba(255,255,255,.15); }
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-black: 800;
 
-/* ===== AI 助手模块 ===== */
-#view-ai { display: none; }
-.ai-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-.ai-bar h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
-.ai-bar .ai-open {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--sub);
-  padding: 8px 18px; border-radius: 999px; font-size: 13px; text-decoration: none; transition: .15s;
-}
-.ai-bar .ai-open:hover { color: var(--txt); border-color: var(--accent2); }
-.ai-wrap {
-  border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
-  background: rgba(15,12,41,.55); box-shadow: 0 14px 40px rgba(0,0,0,.3);
-  backdrop-filter: blur(10px);
-}
-.ai-wrap iframe {
-  width: 100%; height: calc(100vh - 210px); min-height: 520px;
-  border: 0; display: block;
-}
-.ai-tip {
-  margin: 14px auto 0; max-width: 660px; text-align: center;
-  color: var(--sub); font-size: 12.5px; line-height: 1.8;
-  background: rgba(255,255,255,.05); border: 1px solid var(--line);
-  border-radius: 12px; padding: 10px 18px;
+  --bg-base: #0b0918;
+  --bg-mid: #241f4d;
+  --bg-end: #191634;
+  --bg-glow-1: rgba(167,139,250,.10);
+  --bg-glow-2: rgba(147,197,253,.07);
+  --surface-1: rgba(255,255,255,.06);
+  --surface-2: rgba(255,255,255,.10);
+  --field-bg: rgba(0,0,0,.35);
+  --sheet: #141130;
+  --scrim: rgba(5,3,18,.72);
+
+  --text-1: #eef0fa;
+  --text-2: #c2c8e2;
+  --text-muted: #9aa3c7;
+  --text-on-accent: #161238;
+
+  --border-subtle: rgba(255,255,255,.09);
+  --border: rgba(255,255,255,.14);
+  --border-field: #7a76a6;
+  --border-strong: #8a86b5;
+
+  --accent: #c7d2fe;
+  --accent-hover: #dbe3ff;
+  --accent-active: #b3c0f7;
+  --accent-soft: rgba(199,212,254,.14);
+  --link: #a5b4fc;
+  --link-hover: #c7d2fe;
+  --focus: #a5b4fc;
+  --ring-focus: 0 0 0 3px rgba(165,180,252,.28);
+
+  --success: #86efac;
+  --success-soft: rgba(134,239,172,.12);
+  --success-border: rgba(134,239,172,.34);
+  --warning: #fcd34d;
+  --warning-soft: rgba(252,211,77,.12);
+  --warning-border: rgba(252,211,77,.34);
+  --danger: #fca5a5;
+  --danger-soft: rgba(252,165,165,.12);
+  --danger-border: rgba(252,165,165,.34);
+  --info: #93c5fd;
+  --info-soft: rgba(147,197,253,.12);
+  --info-border: rgba(147,197,253,.34);
+
+  --type-flash: #f0abfc;
+  --type-flash-soft: rgba(240,171,252,.14);
+  --type-flash-border: rgba(240,171,252,.32);
+  --type-h5: #93c5fd;
+  --type-h5-soft: rgba(147,197,253,.14);
+  --type-h5-border: rgba(147,197,253,.32);
+
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px;
+  --sp-9: 48px; --sp-10: 64px; --sp-11: 80px; --sp-12: 96px;
+
+  --r-xs: 6px; --r-sm: 10px; --r-md: 12px;
+  --r-lg: 16px; --r-xl: 20px; --r-pill: 999px;
+
+  --sh-1: 0 1px 2px rgba(0,0,0,.32);
+  --sh-2: 0 8px 24px rgba(0,0,0,.36);
+  --sh-3: 0 24px 64px rgba(0,0,0,.56);
+
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+
+  --sidebar-w: 208px;
+  --topbar-h: 56px;
+  --container: 1040px;
+  --pad-page: 16px;
+  --gutter: 12px;
+  --section-gap: 40px;
+  --btn-h-md: 44px;
+  --btn-h-lg: 48px;
+  --input-h: 48px;
 }
 
-/* ===== UI 全面优化 v2：导航指示条 / 统计发光 / 滚动条 / 微动效 ===== */
-.mnav { position: relative; overflow: hidden; }
-.mnav::before {
-  content: ""; position: absolute; left: 0; top: 20%; bottom: 20%; width: 3px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent), var(--pink));
-  transform: scaleY(0); transition: transform .2s ease;
+@media (min-width: 560px){
+  :root{ --pad-page: 20px; --gutter: 16px; --fs-h1: 28px; }
 }
-.mnav:hover::before { transform: scaleY(.6); }
-.mnav.on::before { transform: scaleY(1); }
-.mnav svg { transition: transform .2s ease; }
-.mnav:hover svg { transform: scale(1.12); }
-.counts .pill { transition: .2s; }
-.counts .pill:hover { border-color: rgba(165,180,252,.4); background: rgba(255,255,255,.1); }
-.counts .pill b {
-  background: linear-gradient(135deg, var(--accent), var(--pink));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.tab .n {
-  display: inline-block; min-width: 18px; text-align: center;
-  font-size: 10.5px; background: rgba(255,255,255,.12); border-radius: 999px; padding: 1px 5px;
-}
-.tab.on .n { background: rgba(30,27,75,.18); }
-.cover img { transition: transform .25s ease; }
-.card:hover .cover img { transform: scale(1.06); }
-.card { will-change: transform; }
-::selection { background: rgba(165,180,252,.35); color: #fff; }
-* { scrollbar-width: thin; scrollbar-color: rgba(165,180,252,.35) transparent; }
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { background: rgba(165,180,252,.3); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: rgba(165,180,252,.5); border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-track { background: transparent; }
-
-/* ===== 窄屏：侧边栏转顶部 ===== */
-@media (max-width: 820px) {
-  .layout { flex-direction: column; }
-  .sidebar {
-    width: 100%; height: auto; position: sticky; top: 0;
-    flex-direction: row; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 12px 16px;
-    border-right: 0; border-bottom: 1px solid var(--line);
+@media (min-width: 820px){
+  :root{
+    --fs-h1: 36px; --fs-h2: 24px; --fs-h3: 18px;
+    --fs-card: 16px; --fs-body: 16px; --fs-sm: 14px; --fs-metric: 24px;
+    --lh-h1: 1.2; --lh-h2: 1.3; --lh-h3: 1.4;
+    --pad-page: 24px; --gutter: 20px; --section-gap: 64px;
+    --btn-h-md: 40px; --btn-h-lg: 44px; --input-h: 44px;
   }
-  .sidebar-foot { display: none; }
-  .snav { flex-direction: row; }
-  .mnav { padding: 9px 14px; border-radius: 10px; }
-  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
-  .info h3 { font-size: 14px; }
-  .info .play { display: none; }
-  .ai-wrap iframe { min-height: 72vh; }
+}
+@media (min-width: 1200px){
+  :root{ --pad-page: 32px; }
+}
+
+/* =========================================================== 基座 */
+*,*::before,*::after{ box-sizing: border-box; }
+html{ -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body{
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  background-color: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+/* 背景：移动端纯色；≥820 用固定伪元素，不用 background-attachment:fixed */
+@media (min-width: 820px){
+  body::before{
+    content: "";
+    position: fixed; inset: 0; z-index: -1;
+    background:
+      radial-gradient(1100px 500px at 85% -10%, var(--bg-glow-1), transparent 60%),
+      radial-gradient(900px 460px at -10% 20%, var(--bg-glow-2), transparent 60%),
+      linear-gradient(160deg, var(--bg-base), var(--bg-mid) 58%, var(--bg-end));
+  }
+}
+[hidden]{ display: none !important; }
+img{ max-width: 100%; display: block; }
+a{ color: var(--link); text-decoration: none; }
+a:hover{ color: var(--link-hover); }
+h1,h2,h3,p,ul,ol{ margin: 0; }
+ul,ol{ padding: 0; list-style: none; }
+
+:focus-visible{
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+.sidebar :focus-visible,
+.card:focus-visible,
+.drawer :focus-visible{ outline-offset: -2px; }
+
+.num{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+::selection{ background: rgba(165,180,252,.35); color: #fff; }
+*{ scrollbar-width: thin; scrollbar-color: rgba(165,180,252,.35) transparent; }
+::-webkit-scrollbar{ width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb{
+  background: rgba(165,180,252,.3); border-radius: var(--r-pill);
+  border: 2px solid transparent; background-clip: padding-box;
+}
+
+.skip{
+  position: absolute; left: 8px; top: -60px; z-index: 100;
+  background: var(--sheet); color: var(--text-1);
+  padding: 10px 16px; border-radius: var(--r-sm); border: 1px solid var(--border);
+}
+.skip:focus{ top: 8px; }
+
+/* =========================================================== 布局 */
+.layout{ display: flex; min-height: 100dvh; }
+.main{ flex: 1; min-width: 0; }
+.wrap{
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--sp-5) var(--pad-page) 0;
+}
+@media (min-width: 820px){
+  .wrap{ padding-top: var(--sp-7); }
+}
+
+/* =========================================================== 顶栏（<820） */
+.topbar{
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: var(--topbar-h);
+  padding: 0 var(--pad-page);
+  background: var(--sheet);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.topbar .brand{ flex: 1; }
+.icon-btn{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
+  color: var(--text-2); cursor: pointer; padding: 0;
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.icon-btn:hover{ background: var(--surface-1); color: var(--text-1); }
+.icon-btn svg{ width: 20px; height: 20px; }
+@media (min-width: 820px){ .topbar{ display: none; } }
+
+/* =========================================================== 品牌 */
+.brand{ display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.brand svg{ width: 24px; height: 24px; flex-shrink: 0; }
+.brand-name{ font-size: 18px; font-weight: var(--fw-black); letter-spacing: .02em; color: var(--text-1); }
+.brand-sub{ font-size: var(--fs-label); color: var(--text-muted); font-weight: 400; letter-spacing: 0; }
+@media (min-width: 820px){
+  .brand svg{ width: 26px; height: 26px; }
+}
+
+/* =========================================================== 抽屉（<820） */
+.drawer{
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; flex-direction: column;
+  background: var(--sheet);
+  animation: drawer-in var(--dur-3) var(--ease-out);
+}
+@keyframes drawer-in{ from{ opacity: 0; transform: translateY(-8px); } to{ opacity: 1; transform: none; } }
+.drawer-bar{
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: var(--topbar-h); flex-shrink: 0;
+  padding: 0 var(--pad-page);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.drawer-bar .brand{ flex: 1; }
+.drawer-nav{ flex: 1; overflow-y: auto; }
+.drawer-nav a{
+  display: flex; align-items: center; gap: var(--sp-3);
+  height: 52px; padding: 0 var(--pad-page);
+  color: var(--text-2); font-size: 16px; font-weight: var(--fw-medium);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.drawer-nav a svg{ width: 20px; height: 20px; flex-shrink: 0; color: var(--text-muted); }
+.drawer-nav a[aria-current="page"]{ color: var(--text-1); font-weight: var(--fw-semibold); }
+.drawer-nav a[aria-current="page"] svg{ color: var(--accent); }
+.drawer-user{
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: 72px; padding: var(--sp-3) var(--pad-page);
+  border-top: 1px solid var(--border-subtle);
+}
+@media (min-width: 820px){ .drawer{ display: none !important; } }
+
+/* =========================================================== 侧栏（≥820） */
+.sidebar{ display: none; }
+@media (min-width: 820px){
+  .sidebar{
+    display: flex; flex-direction: column; gap: var(--sp-5);
+    width: var(--sidebar-w); flex-shrink: 0;
+    padding: var(--sp-6) var(--sp-4) var(--sp-5);
+    background: var(--sheet);
+    border-right: 1px solid var(--border-subtle);
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+  }
+}
+.mnav{
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 44px; padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-2); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  position: relative;
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.mnav svg{ width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+.mnav:hover{ background: var(--surface-1); color: var(--text-1); }
+.mnav:hover svg{ color: var(--text-2); }
+.mnav[aria-current="page"]{
+  background: var(--surface-2); color: var(--text-1); font-weight: var(--fw-semibold);
+}
+.mnav[aria-current="page"] svg{ color: var(--accent); }
+.mnav[aria-current="page"]::before{
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
+  width: 3px; border-radius: var(--r-pill); background: var(--accent);
+}
+.snav{ display: flex; flex-direction: column; gap: var(--sp-1); }
+
+/* =========================================================== 用户区 */
+.user-box{
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.user-line{ display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.user-name{
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-admin{
+  flex-shrink: 0; font-size: var(--fs-label); font-weight: var(--fw-semibold);
+  color: var(--type-flash); border: 1px solid var(--type-flash-border);
+  background: var(--type-flash-soft); padding: 1px 7px; border-radius: var(--r-pill);
+}
+.user-foot{ display: flex; align-items: center; gap: var(--sp-2); }
+.side-note{
+  margin-top: var(--sp-2);
+  font-size: var(--fs-label); line-height: var(--lh-sm); color: var(--text-muted);
+}
+
+/* =========================================================== 按钮 */
+.btn{
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  height: var(--btn-h-md); padding: 0 18px;
+  border: 1px solid transparent; border-radius: var(--r-md);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  cursor: pointer; text-align: center; white-space: nowrap;
+  transition: background-color var(--dur-1) linear, border-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.btn--lg{ height: var(--btn-h-lg); padding: 0 24px; font-size: var(--fs-body); }
+.btn--sm{ height: 36px; padding: 0 12px; font-size: var(--fs-xs); border-radius: var(--r-sm); }
+.btn--primary{ background: var(--accent); color: var(--text-on-accent); }
+.btn--primary:hover{ background: var(--accent-hover); color: var(--text-on-accent); }
+.btn--primary:active{ background: var(--accent-active); }
+.btn--secondary{
+  background: var(--surface-1); color: var(--text-1); border-color: var(--border);
+}
+.btn--secondary:hover{ background: var(--surface-2); border-color: var(--border-strong); color: var(--text-1); }
+.btn--text{
+  height: auto; padding: 4px 0; background: none; border: 0;
+  color: var(--link); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+}
+.btn--text:hover{ color: var(--link-hover); text-decoration: underline; text-underline-offset: 3px; }
+.btn:disabled{ opacity: .55; cursor: not-allowed; }
+.btn--block{ width: 100%; }
+
+/* =========================================================== 首屏 */
+.hero{ padding-top: var(--sp-4); }
+@media (min-width: 820px){ .hero{ padding-top: var(--sp-2); } }
+.hero h1{
+  font-size: var(--fs-h1); line-height: var(--lh-h1); font-weight: var(--fw-bold);
+  letter-spacing: -.01em; max-width: 520px;
+}
+.hero-sub{
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2);
+  max-width: 560px;
+}
+.hero-sub .only-sm{ display: none; }
+@media (min-width: 560px){ .hero-sub .only-sm{ display: inline; } }
+.hero-actions{
+  margin-top: var(--sp-5);
+  display: flex; gap: 10px;
+}
+@media (min-width: 820px){ .hero-actions{ gap: var(--sp-3); } }
+.hero-actions .btn{ flex: 1; }
+@media (min-width: 820px){ .hero-actions .btn{ flex: 0 0 auto; } }
+
+.metrics{
+  margin-top: var(--sp-6);
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2);
+}
+.metric{ min-width: 0; }
+.metric-num{
+  display: block;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-metric); font-weight: var(--fw-bold); line-height: 1.2;
+  color: var(--text-1);
+}
+.metric-label{
+  display: block; margin-top: 2px;
+  font-size: var(--fs-label); font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+@media (min-width: 560px){
+  .metric-num{ font-size: var(--fs-metric); }
+  .metrics{ gap: var(--sp-5); }
+}
+@media (min-width: 820px){
+  .metrics{ gap: var(--sp-7); max-width: 620px; }
+}
+
+/* =========================================================== 区块 */
+.block{ margin-top: var(--section-gap); scroll-margin-top: 72px; }
+.block--tight{ margin-top: var(--sp-6); }
+@media (min-width: 820px){ .block--tight{ margin-top: var(--sp-7); } }
+
+.sec-head{ margin-bottom: var(--sp-4); }
+@media (min-width: 820px){ .sec-head{ margin-bottom: var(--sp-5); } }
+.sec-title{ display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.sec-title h2{
+  font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: var(--fw-bold);
+  letter-spacing: -.005em;
+}
+.sec-count{
+  display: inline-flex; align-items: center; height: 22px; padding: 1px 9px;
+  border-radius: var(--r-pill); background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-label); font-weight: var(--fw-semibold); color: var(--text-2);
+}
+.sec-sub{
+  margin-top: 6px; font-size: var(--fs-sm); line-height: var(--lh-sm);
+  color: var(--text-2); max-width: 560px;
+}
+.sec-note{
+  margin-top: var(--sp-4);
+  display: flex; gap: 6px;
+  font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted);
+  max-width: 620px;
+}
+.sec-note svg{ width: 12px; height: 12px; flex-shrink: 0; margin-top: 3px; }
+.sec-note--warn{ color: var(--warning); }
+@media (max-width: 559px){
+  /* 内容高度不够时先牺牲说明文字，永远不牺牲卡片 */
+  .sec-sub--hide-xs{ display: none; }
+}
+
+/* =========================================================== 游戏卡片 */
+.games{ display: grid; gap: var(--gutter); }
+.games--mc{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+.games--flash{ grid-template-columns: minmax(0,1fr); }
+.games--quick{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (min-width: 560px){
+  .games--flash{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .games--quick{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+@media (min-width: 1200px){
+  .games--mc{ grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .games--flash{ grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .games--flash > li{ grid-column: span 2; }
+}
+
+.card{
+  display: block; position: relative; height: 100%;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-1);
+  color: inherit;
+  transition: border-color var(--dur-2) linear, box-shadow var(--dur-2) linear, transform var(--dur-1) var(--ease-out);
+}
+.card:active{ transform: translateY(1px); box-shadow: none; }
+@media (hover: hover) and (pointer: fine){
+  .card:hover{
+    border-color: var(--border-strong);
+    box-shadow: var(--sh-2);
+    transform: translateY(-4px);
+  }
+}
+
+.cover{
+  position: relative; width: 100%; aspect-ratio: 16 / 10; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(160px 120px at 20% 15%, rgba(147,197,253,.22), transparent 70%),
+    radial-gradient(180px 130px at 85% 85%, rgba(240,171,252,.16), transparent 70%),
+    linear-gradient(140deg, #1e1b4b, #312e81 55%, #4338ca);
+}
+.cover--icon img{
+  max-width: 62%; max-height: 78%; width: auto; height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.5));
+}
+.cover--shot{ background: var(--surface-2); }
+.cover--shot img{ width: 100%; height: 100%; object-fit: cover; }
+/* 7 张同图封面靠版本号大字区分：图标上移缩小，版本字落在封面底部 */
+.cover[data-tag]:not([data-tag=""]) img{ max-width: 44%; max-height: 58%; }
+.cover[data-tag]:not([data-tag=""])::after{
+  content: attr(data-tag);
+  position: absolute; left: 0; right: 0; bottom: 8px;
+  text-align: center;
+  font-family: var(--font-mono); font-size: 20px; font-weight: var(--fw-bold);
+  letter-spacing: .04em;
+  color: var(--text-1); opacity: .4;
+  text-shadow: 0 2px 8px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+
+.info{ display: block; padding: 10px 12px 12px; }
+@media (min-width: 820px){ .info{ padding: 12px 14px 14px; } }
+@media (min-width: 1200px){ .info{ padding: 14px 16px 16px; } }
+.card-title{
+  display: block;
+  font-size: var(--fs-card); font-weight: var(--fw-semibold); line-height: 1.35;
+  color: var(--text-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card-desc{
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted);
+}
+.card-meta{
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.card-size{
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.games--flash .card-size{ font-weight: var(--fw-semibold); color: var(--text-2); }
+.card-go{
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--fs-xs); color: var(--link); white-space: nowrap;
+}
+.card-go svg{ width: 12px; height: 12px; }
+
+/* 空区块（构建未注入时的兜底，正常不会出现） */
+.games:empty::after{
+  content: "这一组暂时没有内容";
+  display: block; padding: var(--sp-8) var(--sp-4);
+  text-align: center; color: var(--text-muted); font-size: var(--fs-sm);
+}
+
+/* =========================================================== 面板：先看这三条 */
+.panel{
+  margin-top: var(--section-gap);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+}
+@media (min-width: 820px){ .panel{ padding: var(--sp-6) var(--sp-7); } }
+.panel h2{
+  font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: var(--fw-bold);
+}
+.tips{ margin-top: var(--sp-4); display: grid; gap: var(--sp-5); }
+.tip{ display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-2); }
+.tip-num{
+  width: 24px; height: 24px; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--fs-label); font-weight: var(--fw-bold);
+}
+.tip-title{ font-size: var(--fs-card); font-weight: var(--fw-semibold); color: var(--text-1); }
+.tip-text{ margin-top: 2px; font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
+@media (min-width: 820px){
+  .tips{ grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--sp-6); }
+  .tip{ grid-template-columns: 24px 1fr; }
+  .tip + .tip{ border-left: 1px solid var(--border-subtle); padding-left: var(--sp-6); }
+}
+
+/* =========================================================== 站内其他 */
+.other{ display: grid; gap: var(--gutter); grid-template-columns: minmax(0,1fr); }
+@media (min-width: 560px){ .other{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (min-width: 1200px){ .other{ grid-template-columns: repeat(4, minmax(0,1fr)); } }
+.other-card{
+  display: block; height: 100%;
+  padding: var(--sp-4);
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--r-lg); color: inherit;
+  transition: border-color var(--dur-2) linear, background-color var(--dur-2) linear;
+}
+@media (min-width: 820px){ .other-card{ padding: var(--sp-5); } }
+.other-card:hover{ border-color: var(--border-strong); background: var(--surface-2); }
+.other-ico{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.other-ico svg{ width: 18px; height: 18px; color: var(--accent); }
+.other-title{ display: block; margin-top: var(--sp-3); font-size: var(--fs-card); font-weight: var(--fw-semibold); }
+.other-desc{
+  margin-top: var(--sp-1);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted);
+}
+.other-go{ display: block; margin-top: var(--sp-3); font-size: var(--fs-xs); color: var(--link); }
+
+/* =========================================================== 页脚 */
+.site-foot{
+  margin-top: var(--sp-9);
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--sp-8) var(--pad-page) var(--sp-7);
+  max-width: var(--container); margin-left: auto; margin-right: auto;
+}
+@media (min-width: 820px){
+  .site-foot{ margin-top: var(--sp-12); padding-top: var(--sp-9); }
+  .foot-cols{ display: grid; grid-template-columns: 1.2fr 1.6fr 1fr; gap: var(--sp-7); }
+}
+.foot-col + .foot-col{ margin-top: var(--sp-4); }
+@media (min-width: 820px){ .foot-col + .foot-col{ margin-top: 0; } }
+.foot-brand{ font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--text-1); }
+.foot-line{ margin-top: var(--sp-1); font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); max-width: 420px; }
+.foot-links{ margin-top: var(--sp-2); display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.foot-links a{ font-size: var(--fs-xs); color: var(--text-2); }
+.foot-links a:hover{ color: var(--accent); }
+@media (min-width: 820px){
+  .foot-links{ flex-direction: column; gap: 0; }
+  .foot-links a{ line-height: 28px; }
+}
+
+/* =========================================================== AI 视图 */
+#view-ai{ padding-top: var(--sp-2); }
+.view-head h2{ font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: var(--fw-bold); }
+.view-head p{ margin-top: 6px; font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); max-width: 560px; }
+.steps{ margin-top: var(--sp-5); display: grid; gap: var(--sp-3); max-width: 560px; }
+.steps li{ display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-3); align-items: start; }
+.steps .tip-num{ background: var(--surface-2); color: var(--text-2); }
+.steps span:last-child{ font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
+.ai-wrap{
+  margin-top: var(--sp-5);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface-1); overflow: hidden;
+}
+.ai-wrap iframe{
+  width: 100%; height: calc(100dvh - 220px); min-height: 520px;
+  border: 0; display: block; background: var(--bg-base);
+}
+@media (max-width: 819px){ .ai-wrap iframe{ min-height: 70dvh; } }
+.ai-actions{ margin-top: var(--sp-4); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.ai-note{ margin-top: var(--sp-4); font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); max-width: 560px; }
+
+/* =========================================================== 弹窗 */
+.modal-overlay{
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-4);
+  background: var(--scrim);
+}
+.modal{
+  width: min(100%, 400px);
+  padding: var(--sp-7) var(--sp-5);
+  background: var(--sheet);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-3);
+}
+@media (min-width: 820px){
+  .modal{ width: 420px; padding: var(--sp-8) var(--sp-7); }
+}
+.modal-brand{ display: flex; align-items: center; gap: var(--sp-2); }
+.modal-brand svg{ width: 32px; height: 32px; }
+.modal-brand span{ font-size: 20px; font-weight: var(--fw-black); letter-spacing: .02em; }
+.modal h2{
+  margin-top: var(--sp-2);
+  font-size: 22px; line-height: 1.3; font-weight: var(--fw-bold);
+}
+@media (max-width: 559px){ .modal h2{ font-size: 20px; } }
+.modal-sub{ margin-top: var(--sp-2); font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
+
+.seg{
+  margin-top: var(--sp-6);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  padding: 3px; background: var(--surface-1); border-radius: var(--r-sm);
+}
+.seg-btn{
+  height: 38px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--text-2); font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.seg-btn[aria-pressed="true"]{ background: var(--accent); color: var(--text-on-accent); font-weight: var(--fw-bold); }
+
+.field{ margin-top: var(--sp-4); }
+.field label{
+  display: block; margin-bottom: 6px;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-2);
+}
+.field input{
+  width: 100%; height: var(--input-h); padding: 0 14px;
+  background: var(--field-bg);
+  border: 1px solid var(--border-field); border-radius: var(--r-sm);
+  color: var(--text-1); font-family: inherit; font-size: var(--fs-body);
+  outline: none;
+  transition: border-color var(--dur-1) linear, box-shadow var(--dur-1) linear;
+}
+.field input::placeholder{ color: var(--text-muted); }
+.field input:hover{ border-color: var(--border-strong); }
+.field input:focus{ border-color: var(--link); box-shadow: var(--ring-focus); }
+.field input[aria-invalid="true"]{ border-color: var(--danger); }
+.pwd{ position: relative; }
+.pwd input{ padding-right: 48px; }
+.pwd-toggle{
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: var(--r-sm);
+  color: var(--text-muted); cursor: pointer;
+}
+.pwd-toggle:hover{ color: var(--text-1); }
+.pwd-toggle svg{ width: 18px; height: 18px; }
+.field-err{
+  min-height: 20px; margin-top: 6px;
+  font-size: var(--fs-xs); color: var(--danger);
+}
+.form-err{
+  min-height: 20px; margin-top: var(--sp-1);
+  font-size: var(--fs-xs); color: var(--danger);
+}
+.modal-foot{ margin-top: var(--sp-3); text-align: center; font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); }
+.modal-actions{ margin-top: var(--sp-4); }
+.banner{
+  margin-top: var(--sp-4);
+  padding: 12px 14px; border-radius: var(--r-sm);
+  background: var(--warning-soft); border: 1px solid var(--warning-border);
+  color: var(--warning); font-size: var(--fs-sm); line-height: var(--lh-sm);
+}
+
+/* =========================================================== Toast */
+.toast{
+  position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 90;
+  max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 12px 16px;
+  background: var(--sheet); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--sh-2);
+  font-size: var(--fs-sm); color: var(--text-1);
+}
+.toast::before{
+  content: ""; width: 8px; height: 8px; border-radius: var(--r-pill);
+  background: var(--success); flex-shrink: 0;
+}
+.toast[data-type="error"]::before{ background: var(--danger); }
+.toast[data-type="info"]::before{ background: var(--info); }
+@media (min-width: 820px){
+  .toast{ left: auto; right: var(--sp-6); top: var(--sp-11); bottom: auto; transform: none; }
+}
+
+/* =========================================================== 动效退化 */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 </style>
 </head>
 <body>
-<div class="layout">
-  <aside class="sidebar">
-    <div class="logo">
+<a class="skip" href="#main">跳到主要内容</a>
+
+<!-- ===== 移动端顶栏（<820px）===== -->
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/><path d="M6 30h6M52 30h6M26 40h-8v8M30 44h-8" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="3" fill="#f0abfc"/><circle cx="50" cy="44" r="2.2" fill="#93c5fd"/></svg>
+    <span class="brand-name">games-hub</span>
+  </div>
+  <button class="icon-btn" type="button" id="topLogin" data-login-btn aria-label="登录或注册">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+  </button>
+  <button class="icon-btn" type="button" id="drawerOpen" aria-label="打开导航菜单" aria-expanded="false" aria-controls="drawer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+</header>
+
+<!-- ===== 全屏抽屉（<820px）===== -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-bar">
+    <div class="brand">
       <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/><path d="M6 30h6M52 30h6M26 40h-8v8M30 44h-8" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="3" fill="#f0abfc"/><circle cx="50" cy="44" r="2.2" fill="#93c5fd"/></svg>
-      games-hub
+      <span class="brand-name">games-hub</span>
     </div>
-    <nav class="snav" role="tablist" aria-label="网站模块">
-      <button class="mnav on" data-v="games" role="tab" aria-selected="true">
+    <button class="icon-btn" type="button" id="drawerClose" aria-label="关闭导航菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <nav class="drawer-nav" aria-label="站点导航">
+    <a href="#games" data-view="games" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M9 13h.01M15 10h.01M18 13h.01"/></svg>
+      游戏中心
+    </a>
+    <a href="#ai" data-view="ai">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
+      AI 助手
+    </a>
+    <a href="/tools">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      工具箱
+    </a>
+    <a href="/media">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+      影视音乐
+    </a>
+    <a href="/guestbook">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      留言板
+    </a>
+    <a href="/account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      账号设置
+    </a>
+  </nav>
+  <div class="drawer-user">
+    <button class="btn btn--secondary" type="button" data-login-btn>登录 / 注册</button>
+    <div class="user-line" data-user-slot hidden>
+      <a class="user-name" href="/account" data-user-name></a>
+      <span class="user-admin" data-user-admin hidden>管理员</span>
+      <button class="btn btn--text" type="button" data-logout-btn>退出登录</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ===== 侧栏（≥820px）===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/><path d="M6 30h6M52 30h6M26 40h-8v8M30 44h-8" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="3" fill="#f0abfc"/><circle cx="50" cy="44" r="2.2" fill="#93c5fd"/></svg>
+      <div>
+        <div class="brand-name">games-hub</div>
+        <div class="brand-sub">打开就能玩</div>
+      </div>
+    </div>
+    <nav class="snav" aria-label="站点导航">
+      <a class="mnav" href="#games" data-view="games" aria-current="page">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 10h.01M9 13h.01M15 10h.01M18 13h.01"/></svg>
         游戏中心
-      </button>
-      <button class="mnav" data-v="ai" role="tab" aria-selected="false">
+      </a>
+      <a class="mnav" href="#ai" data-view="ai">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
         AI 助手
-      </button>
+      </a>
       <a class="mnav" href="/tools">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
         工具箱
@@ -299,307 +844,588 @@ body {
         留言板
       </a>
     </nav>
-    <div class="user-box" id="userBox">
-      <button class="user-btn" id="loginBtn" type="button">登录 / 注册</button>
-      <div class="user-info" id="userInfo" style="display:none">
-        <span class="uname" id="uname"></span>
-        <span class="uadmin" id="uadmin" style="display:none">管理员</span>
-        <button class="user-btn small" id="logoutBtn" type="button">退出</button>
+    <div class="user-box">
+      <button class="btn btn--secondary btn--sm" type="button" data-login-btn>登录 / 注册</button>
+      <div class="user-line" data-user-slot hidden>
+        <a class="user-name" href="/account" data-user-name></a>
+        <span class="user-admin" data-user-admin hidden>管理员</span>
       </div>
-    </div>
-    <div class="sidebar-foot">
-      Cloudflare Pages 免费托管<br>
-      <a href="https://github.com/snowandstar/games-assets" target="_blank" rel="noopener">游戏资源库</a> · <a href="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz" target="_blank" rel="noopener">AI 助手</a>
+      <div class="user-foot" data-user-slot hidden>
+        <button class="btn btn--text" type="button" data-logout-btn>退出登录</button>
+      </div>
+      <p class="side-note">由落雪维护</p>
     </div>
   </aside>
 
-  <main class="main">
-    <div class="container">
-      <section id="view-games">
-        <div class="games-head">
-          <h1>游戏中心</h1>
-          <div class="counts" id="counts"></div>
-        </div>
-        <div class="toolbar">
-          <div class="tabs" id="tabs" role="tablist" aria-label="游戏类型筛选">
-            <button class="tab on" data-f="all" role="tab" aria-selected="true">全部</button>
-            <button class="tab" data-f="flash" role="tab" aria-selected="false">Flash 怀旧</button>
-            <button class="tab" data-f="h5" role="tab" aria-selected="false">H5</button>
+  <main class="main" id="main" tabindex="-1">
+    <div class="wrap">
+      <!-- ==================== 游戏中心 ==================== -->
+      <div id="view-games">
+        <section class="hero" aria-labelledby="heroTitle">
+          <h1 id="heroTitle">9 款游戏，打开就能玩</h1>
+          <p class="hero-sub">不用下载、不用安装。Flash 游戏由 Ruffle 在浏览器里直接跑，我的世界 4 个版本都能网页进。<span class="only-sm">体积从 3.6MB 到 65.9MB，小的进得快一些。</span></p>
+          <div class="hero-actions">
+            <a class="btn btn--primary btn--lg" href="#mc">玩我的世界</a>
+            <a class="btn btn--secondary btn--lg" href="#quick">先玩个秒开的</a>
           </div>
-        </div>
-        <div id="grid" class="grid" role="list"></div>
-        <div id="state" class="state" style="display:none"></div>
-      </section>
+          <div class="metrics">
+            <!--@build:metrics-->
+          </div>
+        </section>
 
-      <section id="view-ai">
-        <div class="ai-bar">
-          <h1>AI 助手</h1>
-          <a class="ai-open" href="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz" target="_blank" rel="noopener">新窗口打开 ↗</a>
+        <section class="block" id="mc" aria-labelledby="mcTitle">
+          <header class="sec-head">
+            <div class="sec-title">
+              <h2 id="mcTitle">我的世界网页版：4 个版本</h2>
+              <span class="sec-count"><!--@build:count:mc--></span>
+            </div>
+            <p class="sec-sub sec-sub--hide-xs">都不用装 Java、不用装启动器。体积从 3.6MB 到 19.2MB，网络一般的话小的进得快一些。</p>
+          </header>
+          <ul class="games games--mc" id="list-mc" role="list">
+            <!--@build:cards:mc-->
+          </ul>
+          <div class="sec-note">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4M8 4.8h.01" stroke-linecap="round"/></svg>
+            <span>1.2.5 和 Classic 是早期版本，能不能顺畅运行跟机型和浏览器有关，以实际打开为准。存档存在你自己的浏览器里，换电脑或清缓存会丢。</span>
+          </div>
+        </section>
+
+        <section class="block" id="flash" aria-labelledby="flashTitle">
+          <header class="sec-head">
+            <div class="sec-title">
+              <h2 id="flashTitle">Flash 怀旧：不用装 Flash Player</h2>
+              <span class="sec-count"><!--@build:count:flash--></span>
+            </div>
+            <p class="sec-sub">Flash 2020 年就停止支持了，这里用开源的 Ruffle 模拟器在浏览器里跑 SWF。两款都在 58MB 以上，第一次打开要下完整包，慢是正常的。</p>
+          </header>
+          <ul class="games games--flash" id="list-flash" role="list">
+            <!--@build:cards:flash-->
+          </ul>
+          <div class="sec-note sec-note--warn">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4M8 4.8h.01" stroke-linecap="round"/></svg>
+            <span>建议用电脑 Chrome 或 Edge 玩，手机浏览器基本跑不动。</span>
+          </div>
+        </section>
+
+        <section class="block" id="quick" aria-labelledby="quickTitle">
+          <header class="sec-head">
+            <div class="sec-title">
+              <h2 id="quickTitle">随手就能玩：三款不用等</h2>
+              <span class="sec-count"><!--@build:count:quick--></span>
+            </div>
+            <p class="sec-sub">都在 1MB 以内，点开就是棋盘。手机上只有 2048 能玩，另外两款要键盘。</p>
+          </header>
+          <ul class="games games--quick" id="list-quick" role="list">
+            <!--@build:cards:quick-->
+          </ul>
+        </section>
+
+        <section class="panel" aria-labelledby="tipsTitle">
+          <h2 id="tipsTitle">第一次来？先看这三条</h2>
+          <div class="tips">
+            <div class="tip">
+              <span class="tip-num" aria-hidden="true">1</span>
+              <div>
+                <div class="tip-title">大的游戏第一次要等</div>
+                <p class="tip-text">我的世界 1.12.2 是 19.2MB，死神VS火影两款 58.9MB 和 65.9MB。第一次打开要下完整包，等 1–3 分钟很正常；下过一次之后浏览器会缓存，再玩就快。</p>
+              </div>
+            </div>
+            <div class="tip">
+              <span class="tip-num" aria-hidden="true">2</span>
+              <div>
+                <div class="tip-title">存档在你自己的浏览器里</div>
+                <p class="tip-text">我的世界的世界、2048 和贪吃蛇的最高分，都存在你这台设备的浏览器里。换电脑、换浏览器、清缓存都会看不到。重要存档请自己截图或另存。</p>
+              </div>
+            </div>
+            <div class="tip">
+              <span class="tip-num" aria-hidden="true">3</span>
+              <div>
+                <div class="tip-title">打不开怎么办</div>
+                <p class="tip-text">先按 Ctrl+F5 强制刷新（浏览器会缓存旧文件）。还不行就换个浏览器，或者去留言板写清用的什么浏览器、是不是手机。</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="block" aria-labelledby="otherTitle">
+          <header class="sec-head">
+            <div class="sec-title">
+              <h2 id="otherTitle">除了游戏，这里还有</h2>
+            </div>
+          </header>
+          <ul class="other" role="list">
+            <li>
+              <a class="other-card" href="/tools">
+                <span class="other-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+                <span class="other-title">工具箱</span>
+                <span class="other-desc">二维码、时间戳、进制转换、文本统计、图片压缩、Markdown 预览，6 个工具全在你浏览器里算</span>
+                <span class="other-go">打开工具箱</span>
+              </a>
+            </li>
+            <li>
+              <a class="other-card" href="#ai" data-view="ai">
+                <span class="other-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg></span>
+                <span class="other-title">AI 助手</span>
+                <span class="other-desc">接你自己的 API Key 用的对话应用，支持 DeepSeek、豆包、通义、Kimi</span>
+                <span class="other-go">打开 AI 助手</span>
+              </a>
+            </li>
+            <li>
+              <a class="other-card" href="/guestbook">
+                <span class="other-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="other-title">留言板</span>
+                <span class="other-desc">想加什么游戏、哪个打不开，写在这里</span>
+                <span class="other-go">去留言</span>
+              </a>
+            </li>
+            <li>
+              <a class="other-card" href="/media">
+                <span class="other-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></span>
+                <span class="other-title">影视音乐</span>
+                <span class="other-desc">把想看的、想听的存成自己的一份片单</span>
+                <span class="other-go">打开收藏</span>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ==================== AI 助手 ==================== -->
+      <div id="view-ai" hidden>
+        <div class="view-head">
+          <h2>AI 助手</h2>
+          <p>这是一个接你自己模型账号的对话应用，不是本站提供的免费次数。需要你自己有一个 API Key。</p>
         </div>
-        <div class="ai-wrap">
-          <iframe id="aiFrame" src="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz" title="AI 助手" allow="clipboard-write; fullscreen"></iframe>
+        <ol class="steps">
+          <li><span class="tip-num" aria-hidden="true">1</span><span>点应用左下角的「设置」</span></li>
+          <li><span class="tip-num" aria-hidden="true">2</span><span>选一个服务商：DeepSeek / 豆包 / 通义 / Kimi</span></li>
+          <li><span class="tip-num" aria-hidden="true">3</span><span>把你自己申请的 API Key 填进去，就能开始对话</span></li>
+        </ol>
+        <div class="ai-wrap" id="aiWrap">
+          <iframe id="aiFrame" title="AI 助手" allow="clipboard-write; fullscreen" data-src="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz"></iframe>
         </div>
-        <p class="ai-tip">首次使用：点应用左下角「设置」→ 选一个服务商卡片（DeepSeek / 豆包 / 通义 / Kimi）→ 填入你的 API Key 即可对话。配置只存在你自己的浏览器里，不会上传。</p>
-      </section>
+        <div class="ai-actions">
+          <a class="btn btn--primary" href="https://4m8dv3g0c7b16.doubao.link/app/app_17fuk4uu4pz" target="_blank" rel="noopener">在新窗口打开</a>
+          <a class="btn btn--secondary" href="#games" data-view="games">回游戏中心</a>
+        </div>
+        <p class="ai-note">Key 只存在你自己的浏览器里，不会上传到本站，也不会存在服务器上。换设备要重填。</p>
+      </div>
     </div>
+
+    <footer class="site-foot">
+      <div class="foot-cols">
+        <div class="foot-col">
+          <div class="foot-brand">games-hub · 游戏中心</div>
+          <p class="foot-line">由落雪维护</p>
+        </div>
+        <div class="foot-col">
+          <p class="foot-line">个人小站，非商业用途。游戏文件镜像自公开资源，版权归原作者所有。</p>
+        </div>
+        <div class="foot-col">
+          <p class="foot-line">Cloudflare Pages 托管 · 最后更新 <!--@build:updated--></p>
+          <nav class="foot-links" aria-label="页脚链接">
+            <a href="/tools">工具箱</a>
+            <a href="/guestbook">留言板</a>
+            <a href="/guestbook">版权说明</a>
+          </nav>
+        </div>
+      </div>
+    </footer>
   </main>
 </div>
 
-<!-- 登录 / 注册弹窗 -->
-<div class="modal-overlay" id="loginModal" style="display:none" onclick="if(event.target===this)closeLogin()">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <h2 id="authTitle">登录</h2>
-    <div class="auth-tabs">
-      <button class="auth-tab on" id="tabLogin" type="button" onclick="setAuthMode('login')">登录</button>
-      <button class="auth-tab" id="tabReg" type="button" onclick="setAuthMode('register')">注册</button>
+<!-- ===== 登录 / 注册弹窗 ===== -->
+<div class="modal-overlay" id="loginModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle" aria-describedby="authSub">
+    <div class="modal-brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#302b63"/><path d="M14 26a12 12 0 0 1 24 0M50 26a12 12 0 0 0-24 0" fill="none" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/><path d="M6 30h6M52 30h6M26 40h-8v8M30 44h-8" stroke="#c7d2fe" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="44" cy="40" r="3" fill="#f0abfc"/><circle cx="50" cy="44" r="2.2" fill="#93c5fd"/></svg>
+      <span>games-hub</span>
     </div>
-    <input type="text" id="authUser" placeholder="用户名（2-20 位字母/数字/中文）" autocomplete="username">
-    <input type="password" id="authPass" placeholder="密码（至少 6 位）" autocomplete="current-password">
-    <div class="auth-err" id="authErr"></div>
-    <div class="btn-row">
-      <button class="btn" id="authSubmit" type="button" style="flex:1">登录</button>
-      <button class="btn ghost" type="button" onclick="closeLogin()" style="flex:1">取消</button>
+    <h2 id="authTitle">登录后进入游戏中心</h2>
+    <p class="modal-sub" id="authSub">不用邮箱、不用手机号，取个名字设个密码就行。</p>
+
+    <div id="authExpired" class="banner" hidden>登录状态过期了，重新登录一下就能继续。</div>
+
+    <div class="seg" role="group" aria-label="登录或注册">
+      <button class="seg-btn" type="button" id="segLogin" aria-pressed="true">登录</button>
+      <button class="seg-btn" type="button" id="segReg" aria-pressed="false">注册</button>
     </div>
-    <div class="auth-tip" id="authTip">第一个注册的账号自动成为管理员</div>
+
+    <div class="field">
+      <label for="authUser">用户名</label>
+      <input type="text" id="authUser" autocomplete="username" placeholder="2-20 位字母、数字、下划线或中文" aria-describedby="errUser">
+      <div class="field-err" id="errUser" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="authPass">密码</label>
+      <div class="pwd">
+        <input type="password" id="authPass" autocomplete="current-password" placeholder="至少 6 位" aria-describedby="errPass">
+        <button class="pwd-toggle" type="button" id="pwdToggle" aria-label="显示密码" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg>
+        </button>
+      </div>
+      <div class="field-err" id="errPass" role="alert"></div>
+    </div>
+    <div class="field" id="setupField" hidden>
+      <label for="authSetup">管理员邀请码（可选）</label>
+      <input type="text" id="authSetup" autocomplete="off" placeholder="没有就留空" aria-describedby="errSetup">
+      <div class="field-err" id="errSetup" role="alert"></div>
+    </div>
+    <div class="form-err" id="errForm" role="alert"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn--primary btn--lg btn--block" type="button" id="authSubmit">登录并进入</button>
+    </div>
+    <div class="modal-foot" id="authFoot">没有账号？点上面的「注册」，取个名字就行。</div>
   </div>
 </div>
 
 <script>
-const API_BASE = "/api";
-let GAMES = [];
-let curFilter = "all";
+(function () {
+  "use strict";
 
-function esc(s) {
-  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function fmtSize(mb) {
-  if (mb == null) return "";
-  return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
-}
-function coverHtml(g) {
-  const ver = (g.name.match(/([\d.]+)\s*$/) || [])[1] || "";
-  const typeLabel = g.type === "flash" ? "Flash" : "H5";
-  return `<div class="cover">
-    <img src="${esc(g.icon || "/default.svg")}" alt="${esc(g.name)}" loading="lazy" onerror="this.src='/default.svg'">
-    ${ver ? `<span class="badge-ver">v${esc(ver)}</span>` : ""}
-    <span class="badge-type">${typeLabel}</span>
-  </div>`;
-}
-function cardHtml(g) {
-  const href = g.url || ("/game.html?id=" + encodeURIComponent(g.id));
-  return `<a class="card ${esc(g.type)}" href="${href}" role="listitem">
-    ${coverHtml(g)}
-    <div class="info">
-      <h3>${esc(g.name)}</h3>
-      <div class="meta">
-        <span class="size">${fmtSize(g.size)}</span>
-        <span class="play">开始游戏 →</span>
-      </div>
-    </div>
-  </a>`;
-}
-function render() {
-  const grid = document.getElementById("grid");
-  const list = GAMES.filter(g => curFilter === "all" || g.type === curFilter);
-  if (!list.length) {
-    grid.innerHTML = "";
-    const st = document.getElementById("state");
-    st.style.display = "block";
-    st.innerHTML = curFilter === "all" ? "暂无可用的游戏" : `暂无「${curFilter === "flash" ? "Flash 怀旧" : "H5"}」类游戏`;
-    return;
+  var TOKEN_KEY = "ghub_token";
+  var USER_KEY = "ghub_user";
+  var AI_APP_ORIGIN = "https://4m8dv3g0c7b16.doubao.link";
+
+  /* ---------------- 小工具 ---------------- */
+  function $(id) { return document.getElementById(id); }
+  function all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+  function getToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
   }
-  document.getElementById("state").style.display = "none";
-  grid.innerHTML = list.map(cardHtml).join("");
-}
-function load() {
-  const grid = document.getElementById("grid");
-  grid.innerHTML = Array.from({ length: 4 }, () => `<div class="skeleton" aria-hidden="true"></div>`).join("");
-  fetch(API_BASE + "/games")
-    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(games => {
-      GAMES = Array.isArray(games) ? games : [];
-      render();
-      const flash = GAMES.filter(g => g.type === "flash").length;
-      const h5 = GAMES.filter(g => g.type === "h5").length;
-      document.getElementById("counts").innerHTML =
-        `<span class="pill">共 <b>${GAMES.length}</b> 款</span>
-         <span class="pill">Flash <b>${flash}</b></span>
-         <span class="pill">H5 <b>${h5}</b></span>`;
-      document.querySelectorAll(".tab").forEach(b => {
-        const f = b.dataset.f;
-        const n = f === "all" ? GAMES.length : GAMES.filter(g => g.type === f).length;
-        const span = b.querySelector(".n");
-        if (span) span.textContent = n;
-      });
-    })
-    .catch(err => {
-      grid.innerHTML = "";
-      const st = document.getElementById("state");
-      st.style.display = "block";
-      st.innerHTML = `加载失败，请检查网络后重试。<br><button onclick="load()">重新加载</button>`;
-      console.error(err);
-    });
-}
-
-// 模块切换：游戏中心 / AI 助手
-const modBtns = document.querySelectorAll(".mnav[data-v]");
-function switchView(v) {
-  document.getElementById("view-games").style.display = v === "games" ? "block" : "none";
-  document.getElementById("view-ai").style.display = v === "ai" ? "block" : "none";
-  modBtns.forEach(b => {
-    const on = b.dataset.v === v;
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-selected", on ? "true" : "false");
-  });
-}
-modBtns.forEach(b => b.addEventListener("click", () => switchView(b.dataset.v)));
-
-// 支持 #ai / #games 直达链接（供其他模块页侧边栏跳转）
-function applyHash() {
-  if (location.hash === "#ai") switchView("ai");
-  else if (location.hash === "#games") switchView("games");
-  else if (location.hash === "#login") { switchView("games"); openLogin("login"); }
-}
-window.addEventListener("hashchange", applyHash);
-applyHash();
-
-// ===== AI 助手 iframe：传递登录 token（应用用它调用站内 AI 代理/预设 API）=====
-const AI_APP_ORIGIN = "https://4m8dv3g0c7b16.doubao.link";
-function sendTokenToAiIframe() {
-  const f = document.getElementById("aiFrame");
-  const t = getToken();
-  if (f && f.contentWindow && t) {
-    f.contentWindow.postMessage({ type: "ghub-token", token: t }, AI_APP_ORIGIN);
+  function getUser() {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (e) { return null; }
   }
-}
-const aiIfr = document.getElementById("aiFrame");
-if (aiIfr) {
-  aiIfr.addEventListener("load", () => sendTokenToAiIframe());
-}
-window.addEventListener("message", (e) => {
-  if (e.origin !== AI_APP_ORIGIN) return;
-  if (e.data && e.data.type === "ghub-request-token") {
-    sendTokenToAiIframe();
+  function saveUser(u) {
+    try {
+      if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
+      else localStorage.removeItem(USER_KEY);
+    } catch (e) { /* 隐私模式下忽略 */ }
   }
-});
-
-document.getElementById("tabs").addEventListener("click", e => {
-  const b = e.target.closest(".tab");
-  if (!b) return;
-  document.querySelectorAll(".tab").forEach(x => { x.classList.remove("on"); x.setAttribute("aria-selected", "false"); });
-  b.classList.add("on"); b.setAttribute("aria-selected", "true");
-  curFilter = b.dataset.f;
-  render();
-});
-// 键盘方向键切换筛选
-document.addEventListener("keydown", e => {
-  if (e.target.matches("input, textarea, select")) return;
-  const keys = ["ArrowLeft", "ArrowRight"];
-  if (!keys.includes(e.key)) return;
-  const tabs = [...document.querySelectorAll(".tab")];
-  const idx = tabs.findIndex(b => b.classList.contains("on"));
-  const next = (idx + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
-  tabs[next].click(); tabs[next].focus();
-});
-load();
-
-// ===== 账号系统（登录 / 注册 / 登出）=====
-const TOKEN_KEY = "ghub_token";
-const USER_KEY = "ghub_user";
-function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
-function getUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (e) { return null; } }
-function saveUser(u) { if (u) localStorage.setItem(USER_KEY, JSON.stringify(u)); else localStorage.removeItem(USER_KEY); }
-let authMode = "login";
-function updateAuthUI() {
-  const u = getUser();
-  const loginBtn = document.getElementById("loginBtn");
-  const info = document.getElementById("userInfo");
-  if (u && u.username) {
-    loginBtn.style.display = "none";
-    info.style.display = "flex";
-    const un = document.getElementById("uname");
-    un.textContent = u.username;
-    un.style.cursor = "pointer";
-    un.title = "账号设置";
-    un.onclick = () => { location.href = "/account"; };
-    document.getElementById("uadmin").style.display = u.admin ? "inline" : "none";
-  } else {
-    loginBtn.style.display = "";
-    info.style.display = "none";
+  function saveToken(t) {
+    try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
-}
-function openLogin(mode) {
-  setAuthMode(mode || "login");
-  document.getElementById("loginModal").style.display = "flex";
-  document.getElementById("authUser").focus();
-}
-function closeLogin() { document.getElementById("loginModal").style.display = "none"; }
-function setAuthMode(m) {
-  authMode = m;
-  document.getElementById("authTitle").textContent = m === "login" ? "登录" : "注册";
-  document.getElementById("authSubmit").textContent = m === "login" ? "登录" : "注册";
-  document.getElementById("tabLogin").classList.toggle("on", m === "login");
-  document.getElementById("tabReg").classList.toggle("on", m === "register");
-  document.getElementById("authErr").textContent = "";
-  document.getElementById("authTip").style.display = m === "register" ? "" : "none";
-}
-async function submitAuth() {
-  const u = document.getElementById("authUser").value.trim();
-  const p = document.getElementById("authPass").value;
-  const err = document.getElementById("authErr");
-  err.textContent = "";
-  if (!u || !p) { err.textContent = "请填写用户名和密码"; return; }
-  const btn = document.getElementById("authSubmit");
-  btn.disabled = true;
-  const label = authMode === "login" ? "登录" : "注册";
-  btn.textContent = "请稍候…";
-  try {
-    const res = await fetch("/api/auth/" + (authMode === "login" ? "login" : "register"), {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: u, password: p })
-    });
-    const d = await res.json();
-    if (!res.ok) {
-      err.textContent = d.error || "操作失败";
-      btn.disabled = false; btn.textContent = label; return;
+
+  var toastTimer = null;
+  function toast(msg, type) {
+    var el = $("toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "toast";
+      el.className = "toast";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      document.body.appendChild(el);
     }
-    if (authMode === "register") {
-      // 注册成功 → 自动登录
-      const res2 = await fetch("/api/auth/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      const d2 = await res2.json();
-      if (d2.ok) {
-        localStorage.setItem(TOKEN_KEY, d2.token);
-        saveUser({ username: d2.username, admin: d2.admin });
-      }
-      if (d.admin) alert("注册成功！你是第一个注册的账号，已自动成为管理员。");
-      else alert("注册成功！");
+    el.textContent = msg;
+    el.setAttribute("data-type", type || "success");
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; }, 3000);
+  }
+
+  /* ---------------- 视图切换 ---------------- */
+  var aiLoaded = false;
+
+  function setView(v, noScroll) {
+    var isAi = v === "ai";
+    $("view-games").hidden = isAi;
+    $("view-ai").hidden = !isAi;
+
+    all("[data-view]").forEach(function (a) {
+      if (a.getAttribute("data-view") === v) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+
+    if (isAi) loadAi();
+    else if (!noScroll) try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  function loadAi() {
+    if (aiLoaded) return;
+    aiLoaded = true;
+    var f = $("aiFrame");
+    if (!f) return;
+    var src = f.getAttribute("data-src");
+    f.addEventListener("load", function () {
+      watchAi.ok = true;
+      sendTokenToAi();
+    });
+    f.src = src;
+    watchAi();
+  }
+
+  function watchAi() {
+    setTimeout(function () {
+      if (watchAi.ok) return;
+      var w = $("aiWrap");
+      if (!w) return;
+      w.innerHTML =
+        '<div class="games" style="display:block;padding:48px 20px;text-align:center">' +
+        '<p style="font-size:18px;font-weight:600;margin-bottom:8px">AI 助手没能加载出来</p>' +
+        '<p style="font-size:13px;line-height:1.7;color:var(--text-2);max-width:360px;margin:0 auto 16px">可能是网络被拦了，或者应用暂时不可用。</p>' +
+        '<a class="btn btn--primary" href="' + AI_APP_ORIGIN + '/app/app_17fuk4uu4pz" target="_blank" rel="noopener">在新窗口打开试试</a>' +
+        "</div>";
+    }, 12000);
+  }
+  watchAi.ok = false;
+
+  function applyHash() {
+    var h = (location.hash || "").replace("#", "");
+    // 离开 #login 时把弹窗收起来（hash 直接改的场景不会有 closeModal 的收尾）
+    if (h !== "login" && !modal.hidden) closeModal();
+    if (h === "ai") { setView("ai"); return; }
+    if (h === "login") { setView("games", true); openModal("login", true); return; }
+    if (h === "games" || h === "") { setView("games"); return; }
+    // 其他锚点（#mc / #quick）：确保在游戏视图，但不抢走浏览器自己的滚动
+    setView("games", true);
+  }
+
+  /* ---------------- 抽屉 ---------------- */
+  var drawer = $("drawer");
+  var drawerOpenBtn = $("drawerOpen");
+  var lastFocus = null;
+
+  function openDrawer() {
+    lastFocus = document.activeElement;
+    drawer.hidden = false;
+    document.body.style.overflow = "hidden";
+    drawerOpenBtn.setAttribute("aria-expanded", "true");
+    var first = drawer.querySelector("button, a");
+    if (first) first.focus();
+  }
+  function closeDrawer() {
+    drawer.hidden = true;
+    document.body.style.overflow = "";
+    drawerOpenBtn.setAttribute("aria-expanded", "false");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  drawerOpenBtn.addEventListener("click", openDrawer);
+  $("drawerClose").addEventListener("click", closeDrawer);
+  all("a", drawer).forEach(function (a) { a.addEventListener("click", closeDrawer); });
+
+  /* ---------------- 登录弹窗 ---------------- */
+  var modal = $("loginModal");
+  var authMode = "login";
+  var modalLastFocus = null;
+
+  var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+  function openModal(mode, expired) {
+    modalLastFocus = document.activeElement;
+    setAuthMode(mode || "login");
+    $("authExpired").hidden = !expired;
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    if (window.matchMedia("(min-width: 820px)").matches) $("authUser").focus();
+    else $("segLogin").focus();
+  }
+  function closeModal() {
+    modal.hidden = true;
+    document.body.style.overflow = "";
+    if (modalLastFocus && modalLastFocus.focus) modalLastFocus.focus();
+  }
+
+  function setAuthMode(m) {
+    authMode = m;
+    var isReg = m === "register";
+    $("segLogin").setAttribute("aria-pressed", isReg ? "false" : "true");
+    $("segReg").setAttribute("aria-pressed", isReg ? "true" : "false");
+    $("authTitle").textContent = isReg ? "注册一个账号" : "登录后进入游戏中心";
+    $("authSub").textContent = isReg
+      ? "取个名字、设个密码就行，不填邮箱也不要手机号。"
+      : "不用邮箱、不用手机号，用你注册过的名字进来。";
+    $("authSubmit").textContent = isReg ? "注册并进入" : "登录并进入";
+    $("authFoot").textContent = isReg
+      ? "注册成功会直接进来，不用再登一次。"
+      : "没有账号？点上面的「注册」，取个名字就行。";
+    $("authPass").setAttribute("autocomplete", isReg ? "new-password" : "current-password");
+    $("setupField").hidden = !isReg;
+    clearErrors();
+  }
+
+  function clearErrors() {
+    ["errUser", "errPass", "errSetup", "errForm"].forEach(function (id) { $(id).textContent = ""; });
+    ["authUser", "authPass", "authSetup"].forEach(function (id) { $(id).removeAttribute("aria-invalid"); });
+  }
+
+  function setErr(fieldId, errId, msg) {
+    if (errId) {
+      $(errId).textContent = msg;
+      $(fieldId).setAttribute("aria-invalid", "true");
     } else {
-      localStorage.setItem(TOKEN_KEY, d.token);
-      saveUser({ username: d.username, admin: d.admin });
+      $("errForm").textContent = msg;
     }
-    closeLogin();
-    updateAuthUI();
-  } catch (e) {
-    err.textContent = "网络错误：" + e.message;
   }
-  btn.disabled = false; btn.textContent = label;
-}
-function doLogout() {
-  const t = getToken();
-  if (t) fetch("/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(() => { });
-  localStorage.removeItem(TOKEN_KEY);
-  saveUser(null);
-  updateAuthUI();
-  location.href = "/login.html";
-}
-document.getElementById("loginBtn").addEventListener("click", () => openLogin("login"));
-document.getElementById("logoutBtn").addEventListener("click", doLogout);
-document.getElementById("authSubmit").addEventListener("click", submitAuth);
-document.getElementById("authPass").addEventListener("keydown", e => { if (e.key === "Enter") submitAuth(); });
-updateAuthUI();
+
+  modal.addEventListener("click", function (e) {
+    if (e.target !== modal) return;
+    // 有输入内容时不误触关闭
+    if ($("authUser").value || $("authPass").value) return;
+    closeModal();
+  });
+
+  modal.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+    if (e.key !== "Tab") return;
+    var list = all(FOCUSABLE, modal).filter(function (el) { return el.offsetParent !== null; });
+    if (!list.length) return;
+    var first = list[0], last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !drawer.hidden) closeDrawer();
+  });
+
+  $("pwdToggle").addEventListener("click", function () {
+    var input = $("authPass");
+    var shown = input.type === "text";
+    input.type = shown ? "password" : "text";
+    this.setAttribute("aria-pressed", shown ? "false" : "true");
+    this.setAttribute("aria-label", shown ? "显示密码" : "隐藏密码");
+  });
+
+  $("segLogin").addEventListener("click", function () { setAuthMode("login"); });
+  $("segReg").addEventListener("click", function () { setAuthMode("register"); });
+
+  function submitAuth() {
+    var u = $("authUser").value.trim();
+    var p = $("authPass").value;
+    var setup = $("authSetup").value.trim();
+    clearErrors();
+
+    if (!/^[\w\u4e00-\u9fa5]{2,20}$/.test(u)) {
+      setErr("authUser", "errUser", "用户名要 2-20 位，只能是字母、数字、下划线或中文");
+      $("authUser").focus();
+      return;
+    }
+    if (p.length < 6 || p.length > 64) {
+      setErr("authPass", "errPass", "密码要 6-64 位");
+      $("authPass").focus();
+      return;
+    }
+
+    var btn = $("authSubmit");
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "请稍候…";
+
+    var isReg = authMode === "register";
+    var body = { username: u, password: p };
+    if (isReg && setup) body.setup_code = setup;
+
+    fetch("/api/auth/" + (isReg ? "register" : "login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+    }).then(function (res) {
+      if (!res.ok) {
+        var msg = (res.d && res.d.error) || "操作失败，稍后再试";
+        var code = res.d && res.d.code;
+        if (code === "invalid_setup_code" || /邀请码/.test(msg)) setErr("authSetup", "errSetup", msg);
+        else if (/用户名已被注册|用户名需|用户名或密码/.test(msg)) setErr("authUser", "errUser", msg);
+        else if (/密码/.test(msg)) setErr("authPass", "errPass", msg);
+        else setErr(null, null, msg);
+        btn.disabled = false;
+        btn.textContent = label;
+        return;
+      }
+      if (isReg) {
+        // 注册成功后自动登录，让门禁 cookie 落地
+        return fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        }).then(function (r2) {
+          return r2.json().then(function (d2) {
+            if (d2 && d2.ok) {
+              saveToken(d2.token);
+              saveUser({ username: d2.username, admin: d2.admin });
+              location.replace("/");
+            } else {
+              btn.disabled = false;
+              btn.textContent = label;
+              setErr(null, null, "账号建好了，但自动登录没成功，请手动登录一次");
+              setAuthMode("login");
+            }
+          });
+        });
+      }
+      saveToken(res.d.token);
+      saveUser({ username: res.d.username, admin: res.d.admin });
+      location.replace("/");
+    }).catch(function () {
+      btn.disabled = false;
+      btn.textContent = label;
+      setErr(null, null, "网络错误，检查一下连接再试");
+    });
+  }
+
+  $("authSubmit").addEventListener("click", submitAuth);
+  $("authPass").addEventListener("keydown", function (e) { if (e.key === "Enter") submitAuth(); });
+  $("authUser").addEventListener("keydown", function (e) { if (e.key === "Enter") $("authPass").focus(); });
+
+  /* ---------------- 用户态 ---------------- */
+  function renderUser() {
+    var u = getUser();
+    var logged = !!(u && u.username);
+    all("[data-login-btn]").forEach(function (b) { b.hidden = logged; });
+    all("[data-user-slot]").forEach(function (b) { b.hidden = !logged; });
+    all("[data-user-name]").forEach(function (a) { a.textContent = logged ? u.username : ""; });
+    all("[data-user-admin]").forEach(function (s) { s.hidden = !(logged && u.admin); });
+  }
+
+  all("[data-login-btn]").forEach(function (b) {
+    b.addEventListener("click", function () { if (!drawer.hidden) closeDrawer(); openModal("login", false); });
+  });
+
+  all("[data-logout-btn]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = getToken();
+      if (t) fetch("/api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(function () {});
+      saveToken("");
+      saveUser(null);
+      location.href = "/login.html";
+    });
+  });
+
+  /* ---------------- AI iframe 传 token ---------------- */
+  function sendTokenToAi() {
+    var f = $("aiFrame");
+    var t = getToken();
+    if (f && f.contentWindow && t && f.src) {
+      try { f.contentWindow.postMessage({ type: "ghub-token", token: t }, AI_APP_ORIGIN); } catch (e) {}
+    }
+  }
+  window.addEventListener("message", function (e) {
+    if (e.origin !== AI_APP_ORIGIN) return;
+    if (e.data && e.data.type === "ghub-request-token") sendTokenToAi();
+  });
+
+  /* ---------------- 锚点与视图 ---------------- */
+  all("[data-view]").forEach(function (a) {
+    a.addEventListener("click", function (ev) {
+      var v = a.getAttribute("data-view");
+      if (!v) return;
+      ev.preventDefault();
+      if (drawer && !drawer.hidden) closeDrawer();
+      if (location.hash === "#" + v) setView(v);
+      else location.hash = v;
+    });
+  });
+
+  window.addEventListener("hashchange", applyHash);
+
+  renderUser();
+  applyHash();
+  if (location.search.indexOf("reason=expired") >= 0) openModal("login", true);
+})();
 </script>
 </body>
 </html>
