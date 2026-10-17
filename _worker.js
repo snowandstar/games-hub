@@ -553,44 +553,95 @@ export default {
       return json({ error: "method not allowed" }, 405, true);
     }
 
-    // 首页 HTML 改写：卡片支持 url 直跳（如 /minecraft.html 网页游戏）
-    if (path === "/" || path === "/index.html") {
-      const resp = await env.ASSETS.fetch(request);
-      const ct = resp.headers.get("Content-Type") || "";
-      if (ct.includes("text/html")) {
-        const html = await resp.text();
-        const fixed = html.replace(
-          'return `<a class="card ${esc(g.type)}" href="/game.html?id=${encodeURIComponent(g.id)}" role="listitem">',
-          'const href = g.url || ("/game.html?id=" + encodeURIComponent(g.id));\n  return `<a class="card ${esc(g.type)}" href="${href}" role="listitem">'
-        );
-        return new Response(fixed, {
-          headers: { "Content-Type": "text/html; charset=utf-8", ...SECURITY_HEADERS }
-        });
-      }
-      return resp;
-    }
-
-    // 游戏播放页 HTML 改写：Ruffle 0.6.0 需官方 API 创建播放器
-    // （document.createElement("ruffle-player") 不会注册自定义元素，导致不加载 SWF）
-    if (path === "/game" || path.startsWith("/game/")) {
-      const resp = await env.ASSETS.fetch(request);
-      const ct = resp.headers.get("Content-Type") || "";
-      if (ct.includes("text/html")) {
-        const html = await resp.text();
-        const fixed = html
-          .replace('const player = document.createElement("ruffle-player");', 'const player = window.RufflePlayer.newest().createPlayer();')
-          // 先移除原 appendChild（它在设置 src 之后，顺序错误会导致 Ruffle 不加载）
-          .replace('fc.appendChild(player);', '')
-          // 再把 src 改为：先插入 DOM、后设置 src（Ruffle 0.6 要求元素已连接才触发加载）
-          .replace('player.setAttribute("src", url);', 'fc.appendChild(player); player.src = url;');
-        return new Response(fixed, {
-          headers: { "Content-Type": "text/html; charset=utf-8", ...SECURITY_HEADERS }
-        });
-      }
-      return resp;
-    }
-
-    // 静态资源（Pages 自动提供）
-    return env.ASSETS.fetch(request);
+    // ---------- 静态资源 ----------
+    // 注意：此处不再对返回的 HTML 做运行时字符串改写。
+    // 之前 /game 分支会把 fc.appendChild(player) 删掉、再尝试用另一条规则补回，
+    // 而那条规则匹配的 player.setAttribute("src", url) 在源码里并不存在（源码是 player.src = url），
+    // 导致播放器永远没有插入 DOM —— Flash 游戏 100% 黑屏。页面行为请以 game.html 源码为准。
+    return serveAsset(request, env, path);
   }
 };
+
+// 站内真实存在的页面路径（含无扩展名路由与其 .html 形式）
+// 不在集合内的 HTML 路径，若 ASSETS 仍返回 200 + text/html，
+// 说明是 Pages 的"未知路径回落首页"（无限软 404），需改成真 404。
+const KNOWN_PAGE_PATHS = new Set([
+  "/", "/index.html",
+  "/login", "/login.html",
+  "/tools", "/tools.html",
+  "/media", "/media.html",
+  "/guestbook", "/guestbook.html",
+  "/account", "/account.html",
+  "/ai-admin", "/ai-admin.html",
+  "/game", "/game.html",
+  "/game2048", "/game2048.html",
+  "/minesweeper", "/minesweeper.html",
+  "/snake", "/snake.html",
+  "/minecraft", "/minecraft.html",
+  "/minecraft-1122", "/minecraft-1122.html",
+  "/minecraft-125", "/minecraft-125.html",
+  "/minecraft-classic", "/minecraft-classic.html"
+]);
+
+// 无论如何都不参与登录门禁的路径（门禁正则见 fetch 开头，此处仅作说明）
+// 说明：/robots.txt 与 /404.html 都不匹配门禁正则，因此天然不会被拦截。
+
+const NOINDEX_HEADERS = { "X-Robots-Tag": "noindex, nofollow" };
+
+// HTML 响应统一补安全头 + noindex（登录门禁站兜底，防止被误收录）
+function withNoindex(resp) {
+  const h = new Headers(resp.headers);
+  h.set("X-Robots-Tag", "noindex, nofollow");
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("Referrer-Policy", "same-origin");
+  return h;
+}
+
+// 真 404 响应：优先返回 /404.html 的内容；取不到（或该文件尚未创建、
+// 又被回落成首页）则返回纯文本，绝不抛异常。
+async function notFoundResponse(url, env, fallbackBody) {
+  let body = "404 Not Found";
+  let type = "text/plain; charset=utf-8";
+  try {
+    const nf = await env.ASSETS.fetch(new Request(new URL("/404.html", url).toString(), { method: "GET" }));
+    if (nf.ok && (nf.headers.get("Content-Type") || "").includes("text/html")) {
+      const html = await nf.text();
+      // 与回落内容完全一致 => /404.html 也不存在，Pages 又把它回落成了首页
+      if (html && html !== fallbackBody) {
+        body = html;
+        type = "text/html; charset=utf-8";
+      }
+    }
+  } catch (e) {
+    // 忽略：保持纯文本兜底
+  }
+  return new Response(body, {
+    status: 404,
+    headers: { "Content-Type": type, "Cache-Control": "no-store", ...SECURITY_HEADERS, ...NOINDEX_HEADERS }
+  });
+}
+
+// 统一出口：静态资源 + HTML 加 noindex + 软 404 兜底
+async function serveAsset(request, env, path) {
+  const resp = await env.ASSETS.fetch(request);
+  const ct = resp.headers.get("Content-Type") || "";
+  // 非 HTML（图片 / JS / CSS / JSON 等）原样返回
+  if (!ct.includes("text/html")) return resp;
+
+  // 无 body 的请求（HEAD 等）只补响应头
+  if (request.method !== "GET") {
+    return new Response(null, { status: resp.status, statusText: resp.statusText, headers: withNoindex(resp) });
+  }
+
+  const body = await resp.text();
+
+  // 到这里 Content-Type 一定是 text/html：真实静态资源（.js/.css/.jpg/.json/.txt…）
+  // 不会返回 text/html，所以无需再按扩展名分流。
+  // 因此：路径不在已知页面集合内 且 仍返回 200 + HTML => 就是 Pages 回落首页，改判真 404。
+  // （/robots.txt、/404.html 若文件不存在，同样会回落，这里一并按 404 处理，避免软 404。）
+  if (resp.status === 200 && !KNOWN_PAGE_PATHS.has(path)) {
+    return notFoundResponse(new URL(request.url), env, body);
+  }
+
+  return new Response(body, { status: resp.status, statusText: resp.statusText, headers: withNoindex(resp) });
+}
