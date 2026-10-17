@@ -1,80 +1,34 @@
 // Cloudflare Pages 单文件 Worker 模式（advanced mode）
 // 处理：静态资源 + /api/games + /api/swf（大 SWF 转发，私有 Release + Token）
 //
-// 数据源说明：游戏列表以内嵌数组为权威（部署时随 Worker 更新）；
-// 仓库内 games.json 为本地开发参考副本，新增游戏时两处需同步。
+// 数据源：唯一权威是仓库根目录的 games.json（静态资源），由 loadGames() 读取并缓存。
 
-const games = [
-  {
-    "id": "minecraft-188",
-    "name": "我的世界 1.8.8",
-    "type": "h5",
-    "size": 14.4,
-    "icon": "/default.svg",
-    "url": "/minecraft.html"
-  },
-  {
-    "id": "minecraft-1122",
-    "name": "我的世界 1.12.2",
-    "type": "h5",
-    "size": 19.2,
-    "icon": "/default.svg",
-    "url": "/minecraft-1122.html"
-  },
-  {
-    "id": "minecraft-125",
-    "name": "我的世界 1.2.5",
-    "type": "h5",
-    "size": 6,
-    "icon": "/default.svg",
-    "url": "/minecraft-125.html"
-  },
-  {
-    "id": "minecraft-classic",
-    "name": "我的世界 Classic 0.30",
-    "type": "h5",
-    "size": 3.6,
-    "icon": "/default.svg",
-    "url": "/minecraft-classic.html"
-  },
-  {
-    "id": "bleshui-vs-huoYing-3.2",
-    "name": "死神VS火影 3.2",
-    "type": "flash",
-    "size": 58.9,
-    "icon": "/bh32.jpg",
-    "swf": "bh32.swf"
-  },
-  {
-    "id": "bleshui-vs-huoYing-3.3",
-    "name": "死神VS火影 3.3",
-    "type": "flash",
-    "size": 65.9,
-    "icon": "/bh33.jpg",
-    "swf": "bh33.swf"
-  },
-  {
-    "id": "game2048",
-    "name": "2048",
-    "type": "h5",
-    "icon": "/default.svg",
-    "url": "/game2048.html"
-  },
-  {
-    "id": "minesweeper",
-    "name": "扫雷",
-    "type": "h5",
-    "icon": "/default.svg",
-    "url": "/minesweeper.html"
-  },
-  {
-    "id": "snake",
-    "name": "贪吃蛇",
-    "type": "h5",
-    "icon": "/default.svg",
-    "url": "/snake.html"
-  }
-];
+// 游戏数据单源化：唯一数据源是仓库里的 /games.json（静态资源），Worker 里不再内嵌数组。
+// 新增游戏只改 games.json 一处；/api/games（给首页和播放页）与 /api/swf（找资产 id）都读它。
+//
+// 缓存分两层，都是 module 级（isolate 内有效，isolate 被回收后自动重建）：
+//   gamesCache      —— 解析后的数组，给 /api/swf 的 find 用
+//   gamesJsonCache  —— 预序列化字符串，给 /api/games 直接当响应体用
+// 预序列化是为了让每个 /api/games 请求只做一次 Response 构造，不再重复 JSON.stringify
+// （9 条数据虽小，但这个接口是首页与播放页的必经之路）。
+const GAMES_CACHE_TTL = 60000; // 与响应头 max-age=60 对齐
+let gamesCache = null;
+let gamesJsonCache = null;
+let gamesCacheAt = 0;
+
+async function loadGames(url, env) {
+  const now = Date.now();
+  if (gamesCache && gamesJsonCache && now - gamesCacheAt < GAMES_CACHE_TTL) return gamesCache;
+  const res = await env.ASSETS.fetch(new Request(new URL("/games.json", url).toString(), { method: "GET" }));
+  if (!res.ok) throw new Error("games.json HTTP " + res.status);
+  const arr = JSON.parse(await res.text());
+  if (!Array.isArray(arr)) throw new Error("games.json 不是数组");
+  // 只有完整解析成功才覆盖旧缓存：刷新失败时下面的调用方还能用旧数据兜底
+  gamesCache = arr;
+  gamesJsonCache = JSON.stringify(arr);
+  gamesCacheAt = now;
+  return arr;
+}
 
 // 私有仓库 Release（不公开，需 Token 访问）
 // GitHub 私有 Release 资产必须走 API 资产端点（releases/download 对 fine-grained token 返回 404）
@@ -118,7 +72,8 @@ const CSP_REPORT_ONLY = [
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "same-origin",
+  // 不用 same-origin：它连站内跳外链都不带 referrer，来源判断会失真
+  "Referrer-Policy": "strict-origin-when-cross-origin",
   "Content-Security-Policy-Report-Only": CSP_REPORT_ONLY
 };
 
@@ -140,6 +95,65 @@ function json(data, status, cors) {
       ...(cors ? AI_CORS_HEADERS : {})
     }
   });
+}
+
+// ---------- 用户自带 Key 时的 SSRF 拦截 ----------
+// /api/ai/chat 允许用户填自己的 baseURL，等于给了「让 Worker 去发一个请求」的能力，
+// 所以必须拦内网与本机地址，否则能拿它探 Cloudflare 边缘能看到的内部服务。
+//
+// 局限（如实写，不要假装完全防住）：
+//   1) Worker 没有 DNS resolve API，只能按「主机名字符串 + 字面量 IP 段」判断。
+//      所以「域名 A 记录指向内网」（http://internal.evil.com/ → 10.x）挡不住。
+//   2) DNS rebinding 挡不住：校验时解析到公网 IP、真正 fetch 时再解析到内网；
+//      因为没有独立 resolver，无法把「校验用的 IP」固定给「请求用的连接」。
+//   要挡死这两条得上 Durable Object 或自建 resolver，这个体量不值得。
+//
+//   反过来有个意外收获：WHATWG URL 解析器会把十进制 / 十六进制 / 八进制 / 短写的 IPv4
+//   归一化成点分十进制（实测 https://2130706433/ 与 https://127.1/ 的 hostname 都是 127.0.0.1），
+//   所以这几类变形不需要自己处理，交给 new URL() 就行。
+//   （该实测在 Node 22 上做的；Cloudflare Worker 用的是同一套 WHATWG URL 规范，预期一致，
+//    但我没有 Worker 运行时可验证，属未验证项。）
+function isPrivateHost(hostname) {
+  const s = String(hostname || "").trim().toLowerCase().replace(/\.$/, ""); // 去掉根点：localhost. == localhost
+  if (!s) return true;
+  if (s === "localhost" || s.endsWith(".localhost")) return true;
+  if (s.endsWith(".local") || s.endsWith(".internal")) return true;
+  if (s === "[::1]" || s === "[::]") return true;
+  if (s.startsWith("[")) {
+    // IPv4-mapped IPv6：URL 解析器会把 [::ffff:127.0.0.1] 归一化成 [::ffff:7f00:1]
+    const mapped = s.slice(1, -1).match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (!mapped) return false; // 其他 IPv6 字面量按公开处理
+    const hi = parseInt(mapped[1], 16);
+    const lo = parseInt(mapped[2], 16);
+    return isPrivateV4((hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff);
+  }
+  const m = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false; // 域名按公开处理
+  return isPrivateV4(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]));
+}
+function isPrivateV4(a, b, c, d) {
+  if ([a, b, c, d].some(n => !Number.isInteger(n) || n < 0 || n > 255)) return true; // 非法就按危险处理
+  if (a === 0) return true;          // 0.0.0.0/8
+  if (a === 127) return true;        // 127.0.0.0/8 回环
+  if (a === 10) return true;         // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true;          // 192.168.0.0/16
+  if (a === 169 && b === 254) return true;          // 169.254.0.0/16 链路本地（含云厂商元数据端点）
+  return false;
+}
+// 返回 null 表示放行，否则返回可直接 return 的错误响应
+function ssrfCheck(baseURL) {
+  if (!/^https:\/\//.test(baseURL)) return json({ error: "API 地址必须是 https 链接", code: "invalid_base_url" }, 400, true);
+  let host = "";
+  try {
+    host = new URL(baseURL).hostname;
+  } catch (e) {
+    return json({ error: "API 地址格式不正确", code: "invalid_base_url" }, 400, true);
+  }
+  if (isPrivateHost(host)) {
+    return json({ error: "API 地址不能是内网或本机地址", code: "invalid_base_url" }, 400, true);
+  }
+  return null;
 }
 
 // ---------- AI 对话限流 ----------
@@ -461,25 +475,53 @@ export default {
       }
     }
 
-    // 游戏列表接口
+    // 游戏列表接口（数据源 = /games.json，见 loadGames）
     if (path === "/api/games") {
-      return json(games);
+      try {
+        await loadGames(url, env);
+      } catch (e) {
+        // 刷新失败时只要有旧缓存就继续用旧的：首页空白比数据旧 60 秒严重得多
+        if (!gamesJsonCache) {
+          console.error("[games] games.json 读取失败: " + (e && e.message));
+          return json({ error: "游戏数据暂时不可用", code: "data_unavailable" }, 500);
+        }
+        console.error("[games] games.json 刷新失败，沿用旧缓存: " + (e && e.message));
+      }
+      // 契约 §4.0：/api/games 是唯一允许被缓存的 API（no-store 的例外）
+      return new Response(gamesJsonCache, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=60",
+          ...SECURITY_HEADERS
+        }
+      });
     }
 
     // 大 SWF 转发（私有 GitHub Release，带 Token）
     if (path === "/api/swf") {
       const id = url.searchParams.get("id") || "";
-      const game = games.find(g => g.id === id);
+      let game = null;
+      try {
+        const list = await loadGames(url, env);
+        game = list.find(g => g.id === id) || null;
+      } catch (e) {
+        console.error("[swf] games.json 读取失败: " + (e && e.message));
+        return json({ error: "游戏数据暂时不可用", code: "data_unavailable" }, 500);
+      }
       if (!game) {
-        return json({ error: "Game not found" }, 404);
+        return json({ error: "Game not found", code: "game_not_found" }, 404);
       }
       const token = env.GH_TOKEN || "";
       if (!token) {
-        return json({ error: "GH_TOKEN not configured" }, 500);
+        return json({ error: "GH_TOKEN not configured", code: "gh_token_missing" }, 500);
       }
-      const assetId = ASSET_IDS[game.swf];
+      // games.json 里的 swf 是路径（"/swf/bh32.swf"），ASSET_IDS 的键是裸文件名。
+      // 取 basename 再查，两种写法都能对上——否则换数据源那天 Flash 游戏会集体 404。
+      const swfName = String(game.swf || "").split("/").pop();
+      const assetId = ASSET_IDS[swfName];
       if (!assetId) {
-        return json({ error: "Asset id not found" }, 404);
+        return json({ error: "Asset id not found", code: "asset_not_found" }, 404);
       }
       // Cloudflare Cache API 显式缓存（Pages Worker 响应默认不进 CDN 缓存）
       const cacheKey = new Request(url, { method: "GET" });
@@ -893,8 +935,10 @@ export default {
             baseURL = String(body.baseURL || "").trim();
             model = String(body.model || "").trim();
             apiKey = String(body.key || "").trim();
-            if (!baseURL || !model || !apiKey) return json({ error: "请提供 API 地址、模型和 Key" }, 400, true);
-            if (!/^https:\/\//.test(baseURL)) return json({ error: "API 地址必须是 https 链接" }, 400, true);
+            if (!baseURL || !model || !apiKey) return json({ error: "请提供 API 地址、模型和 Key", code: "params_required" }, 400, true);
+            // 用户自带 Key 模式下地址由用户填，必须拦 SSRF（预设模式的地址是管理员填的，暂不套用，见 ssrfCheck 注释）
+            const bad = ssrfCheck(baseURL);
+            if (bad) return bad;
           }
           // 计数写入放到后台：请求已经放行，写失败也不该让这次对话失败
           aiRateCommit(env, ctx, rl);
@@ -955,7 +999,7 @@ function withNoindex(resp) {
   const h = new Headers(resp.headers);
   h.set("X-Robots-Tag", "noindex, nofollow");
   h.set("X-Content-Type-Options", "nosniff");
-  h.set("Referrer-Policy", "same-origin");
+  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
   h.set("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY);
   return h;
 }
