@@ -267,7 +267,7 @@ function cardHtml(g) {
   const tagAttr = tag ? ` data-tag="${esc(tag)}"` : "";
   const shotIdx = g.cover ? ` srcset="${esc(g.cover)}"` : "";
 
-  return `<li data-type="${type}">
+  return `<li data-type="${type}" data-id="${esc(g.id)}">
           <a class="card" href="${esc(href)}">
             <span class="${coverMod}"${tagAttr}><img src="${icon}"${shotIdx} alt="" width="${w}" height="${h}" loading="lazy"></span>
             <span class="info">
@@ -279,6 +279,9 @@ function cardHtml(g) {
               </span>
             </span>
           </a>
+          <button class="fav" type="button" data-fav="${esc(g.id)}" aria-pressed="false" aria-label="收藏 ${name}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85z"/></svg>
+          </button>
         </li>`;
 }
 

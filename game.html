@@ -149,6 +149,20 @@ function boot() {
       const game = (games || []).find(g => g.id === id);
       if (!game) { showError("未找到该游戏", false); return; }
       curGame = game;
+      // 记一笔「最近玩」：从首页点进来的已记过，直接访问播放页的靠这里补
+      try {
+        var RK = "ghub_recent";
+        var rl = JSON.parse(localStorage.getItem(RK) || "[]");
+        if (!Array.isArray(rl)) rl = [];
+        rl = rl.filter(function (x) { return x && x.id !== game.id; });
+        rl.unshift({
+          id: game.id,
+          name: game.name,
+          href: game.url || ("/game.html?id=" + encodeURIComponent(game.id)),
+          ts: Date.now()
+        });
+        localStorage.setItem(RK, JSON.stringify(rl.slice(0, 6)));
+      } catch (e) { /* 隐私模式忽略 */ }
       document.getElementById("gameTitle").textContent = game.name;
       document.title = game.name + " | 游戏中心";
       const tag = document.getElementById("typeTag");

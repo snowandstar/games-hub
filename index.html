@@ -396,6 +396,112 @@ ul,ol{ padding: 0; list-style: none; }
   .metrics{ gap: var(--sp-7); max-width: 620px; }
 }
 
+/* =========================================================== 继续玩 / 搜索 */
+.resume{ margin-top: var(--sp-4); }
+/* 手机上首屏高度金贵：有「继续玩」时数字条让位（老用户不需要被再次说服） */
+@media (max-width: 559px){
+  body.has-resume .metrics{ display: none; }
+}
+.resume a{
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 12px 14px; min-height: 48px;
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text-1);
+  transition: border-color var(--dur-1) linear, background-color var(--dur-1) linear;
+}
+.resume a:hover{ border-color: var(--border-strong); background: var(--surface-2); color: var(--text-1); }
+.resume-k{
+  flex-shrink: 0; font-size: var(--fs-label); font-weight: var(--fw-bold);
+  letter-spacing: .04em; color: var(--accent);
+}
+.resume-name{
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.resume-time{ flex-shrink: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.resume-go{
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--fs-xs); color: var(--link);
+}
+.resume-go svg{ width: 12px; height: 12px; }
+
+.toolbar2{ margin-top: var(--sp-6); display: flex; align-items: center; gap: var(--sp-2); }
+.search{
+  position: relative; flex: 1; min-width: 0;
+  display: flex; align-items: center;
+  height: var(--input-h);
+  background: var(--field-bg);
+  border: 1px solid var(--border-field); border-radius: var(--r-sm);
+  transition: border-color var(--dur-1) linear, box-shadow var(--dur-1) linear;
+}
+.search:focus-within{ border-color: var(--link); box-shadow: var(--ring-focus); }
+.search-ico{ width: 18px; height: 18px; margin-left: 12px; color: var(--text-muted); flex-shrink: 0; }
+.search input{
+  flex: 1; min-width: 0; height: 100%;
+  border: 0; background: none; outline: none;
+  color: var(--text-1); font-family: inherit; font-size: var(--fs-sm);
+  padding: 0 var(--sp-2);
+}
+.search input::placeholder{ color: var(--text-muted); }
+.search input::-webkit-search-cancel-button{ display: none; }
+.search-clear{
+  width: 40px; height: 40px; margin-right: 2px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; border-radius: var(--r-xs);
+  color: var(--text-muted); cursor: pointer;
+}
+.search-clear:hover{ color: var(--text-1); background: var(--surface-1); }
+.search-kbd{ display: none; }
+@media (min-width: 820px){
+  .search-kbd{
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; margin-right: 10px;
+    border: 1px solid var(--border); border-radius: var(--r-xs);
+    font-family: var(--font-mono); font-size: var(--fs-label); color: var(--text-muted);
+  }
+}
+.chip{
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--input-h); padding: 0 12px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-sm);
+  color: var(--text-2); font-family: inherit; font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold); cursor: pointer; white-space: nowrap;
+  transition: border-color var(--dur-1) linear, background-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.chip svg{ width: 14px; height: 14px; }
+.chip:hover{ border-color: var(--border-strong); color: var(--text-1); }
+.chip[aria-pressed="true"]{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.chip-n{ font-family: var(--font-mono); opacity: .8; }
+
+.games > li{ position: relative; }
+.fav{
+  position: absolute; top: 4px; right: 4px; z-index: 1;
+  width: 44px; height: 44px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fav svg{
+  width: 18px; height: 18px;
+  fill: none; stroke: var(--text-1); stroke-width: 2; stroke-linejoin: round;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.75));
+  transition: fill var(--dur-1) linear, stroke var(--dur-1) linear;
+}
+.fav:hover svg{ stroke: var(--warning); }
+.fav[aria-pressed="true"] svg{ fill: var(--warning); stroke: var(--warning); }
+
+.search-empty{
+  margin-top: var(--sp-5);
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+}
+.search-empty p{ font-size: var(--fs-card); font-weight: var(--fw-semibold); }
+.search-empty span{ display: block; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-2); }
+.search-empty button{ margin-top: var(--sp-4); }
+
 /* =========================================================== 区块 */
 .block{ margin-top: var(--section-gap); scroll-margin-top: 72px; }
 .block--tight{ margin-top: var(--sp-6); }
@@ -868,8 +974,37 @@ ul,ol{ padding: 0; list-style: none; }
             <a class="btn btn--primary btn--lg" href="#mc">玩我的世界</a>
             <a class="btn btn--secondary btn--lg" href="#quick">先玩个秒开的</a>
           </div>
+          <div class="resume" id="resume" hidden>
+            <a id="resumeLink" href="/">
+              <span class="resume-k">继续玩</span>
+              <span class="resume-name" id="resumeName"></span>
+              <span class="resume-time" id="resumeTime"></span>
+              <span class="resume-go">进入
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+              </span>
+            </a>
+          </div>
           <div class="metrics">
             <!--@build:metrics-->
+          </div>
+          <div class="toolbar2">
+            <div class="search">
+              <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input type="search" id="q" placeholder="搜游戏名，比如「我的世界」「扫雷」" aria-label="搜索游戏" autocomplete="off" enterkeyhint="search">
+              <button class="search-clear" type="button" id="qClear" hidden aria-label="清空搜索">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+              <kbd class="search-kbd" aria-hidden="true">/</kbd>
+            </div>
+            <button class="chip" type="button" id="favOnly" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85z"/></svg>
+              只看收藏 <span class="chip-n" id="favCount">0</span>
+            </button>
+          </div>
+          <div class="search-empty" id="searchEmpty" hidden>
+            <p id="emptyTitle">没有匹配的游戏</p>
+            <span id="emptyDesc">换个词试试，或者清空筛选看全部 9 款。</span>
+            <button class="btn btn--secondary btn--sm" type="button" id="emptyReset">清空搜索和筛选</button>
           </div>
         </section>
 
@@ -1183,6 +1318,166 @@ ul,ol{ padding: 0; list-style: none; }
     setView("games", true);
   }
 
+  /* ---------------- 本地偏好：收藏 / 最近玩 ---------------- */
+  var FAV_KEY = "ghub_fav";
+  var RECENT_KEY = "ghub_recent";
+  var RECENT_MAX = 6;
+
+  function readJson(key, dflt) {
+    try {
+      var v = JSON.parse(localStorage.getItem(key) || "null");
+      return v == null ? dflt : v;
+    } catch (e) { return dflt; }
+  }
+  function writeJson(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  var favs = readJson(FAV_KEY, []);
+  if (!Array.isArray(favs)) favs = [];
+  var favSet = {};
+  favs.forEach(function (id) { favSet[id] = true; });
+
+  function idOf(li) { return li.getAttribute("data-id") || ""; }
+  function nameOf(li) {
+    var t = li.querySelector(".card-title");
+    return t ? t.textContent.trim() : "";
+  }
+
+  function syncFavButtons() {
+    all("[data-fav]").forEach(function (b) {
+      var id = b.getAttribute("data-fav");
+      var on = !!favSet[id];
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      var li = b.closest("li");
+      b.setAttribute("aria-label", (on ? "取消收藏 " : "收藏 ") + (li ? nameOf(li) : ""));
+    });
+    var n = Object.keys(favSet).length;
+    $("favCount").textContent = n;
+    if (!n) $("favOnly").setAttribute("aria-pressed", "false");
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-fav]");
+    if (!b) return;
+    e.preventDefault();
+    var id = b.getAttribute("data-fav");
+    if (favSet[id]) { delete favSet[id]; toast("已取消收藏", "info"); }
+    else { favSet[id] = true; toast("已收藏，可用「只看收藏」筛出来"); }
+    writeJson(FAV_KEY, Object.keys(favSet));
+    syncFavButtons();
+    applyFilter();
+  });
+
+  /* 点卡片就记一笔，不等播放页加载完（H5 直连页也能覆盖） */
+  function recordRecent(id, name, href) {
+    if (!id) return;
+    var list = readJson(RECENT_KEY, []);
+    if (!Array.isArray(list)) list = [];
+    list = list.filter(function (x) { return x && x.id !== id; });
+    list.unshift({ id: id, name: name, href: href, ts: Date.now() });
+    writeJson(RECENT_KEY, list.slice(0, RECENT_MAX));
+  }
+
+  function ago(ts) {
+    var d = Date.now() - ts;
+    if (d < 60e3) return "刚刚";
+    if (d < 3600e3) return Math.floor(d / 60e3) + " 分钟前";
+    if (d < 86400e3) return Math.floor(d / 3600e3) + " 小时前";
+    var days = Math.floor(d / 86400e3);
+    return days === 1 ? "昨天" : days + " 天前";
+  }
+
+  function renderResume() {
+    var list = readJson(RECENT_KEY, []);
+    if (!Array.isArray(list) || !list.length) return;
+    var last = list[0];
+    if (!last || !last.id) return;
+    $("resumeName").textContent = last.name || last.id;
+    $("resumeTime").textContent = ago(last.ts || Date.now());
+    $("resumeLink").setAttribute("href", last.href || "/");
+    $("resume").hidden = false;
+    document.body.classList.add("has-resume");
+  }
+
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("#view-games .card");
+    if (!a) return;
+    var li = a.closest("li");
+    if (!li) return;
+    recordRecent(idOf(li), nameOf(li), a.getAttribute("href"));
+  });
+
+  /* ---------------- 搜索与筛选 ---------------- */
+  var qEl = $("q");
+
+  function applyFilter() {
+    var q = (qEl.value || "").trim().toLowerCase();
+    var favOnly = $("favOnly").getAttribute("aria-pressed") === "true";
+    var shown = 0;
+
+    all("#view-games .games > li").forEach(function (li) {
+      var okQ = !q || (li.textContent || "").toLowerCase().indexOf(q) >= 0;
+      var okF = !favOnly || !!favSet[idOf(li)];
+      var ok = okQ && okF;
+      li.hidden = !ok;
+      if (ok) shown++;
+    });
+
+    // 一组都没匹配就整块收起，不留空标题
+    all("#view-games .block[id]").forEach(function (sec) {
+      var list = sec.querySelector(".games");
+      if (!list) return;
+      var any = [].some.call(list.children, function (li) { return !li.hidden; });
+      sec.hidden = !any;
+    });
+
+    // 筛选时把「除了游戏，这里还有」也收起来，结果更集中
+    var other = document.querySelector('#view-games section[aria-labelledby="otherTitle"]');
+    if (other) other.hidden = !!(q || favOnly);
+
+    var empty = $("searchEmpty");
+    empty.hidden = shown > 0;
+    if (!shown) {
+      var favEmpty = favOnly && !q;
+      $("emptyTitle").textContent = favEmpty ? "还没有收藏的游戏" : "没有匹配的游戏";
+      $("emptyDesc").textContent = favEmpty
+        ? "点卡片右上角的星标就能收藏，收藏只存在你自己的浏览器里。"
+        : "换个词试试，或者清空筛选看全部。";
+    }
+
+    $("qClear").hidden = !q;
+  }
+
+  qEl.addEventListener("input", applyFilter);
+  $("qClear").addEventListener("click", function () {
+    qEl.value = "";
+    applyFilter();
+    qEl.focus();
+  });
+  $("favOnly").addEventListener("click", function () {
+    var on = $("favOnly").getAttribute("aria-pressed") === "true";
+    $("favOnly").setAttribute("aria-pressed", on ? "false" : "true");
+    applyFilter();
+  });
+  $("emptyReset").addEventListener("click", function () {
+    qEl.value = "";
+    $("favOnly").setAttribute("aria-pressed", "false");
+    applyFilter();
+  });
+
+  // 「/」聚焦搜索，Esc 清空
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    e.preventDefault();
+    qEl.focus();
+  });
+  qEl.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { qEl.value = ""; applyFilter(); qEl.blur(); }
+  });
+
   /* ---------------- 抽屉 ---------------- */
   var drawer = $("drawer");
   var drawerOpenBtn = $("drawerOpen");
@@ -1423,6 +1718,9 @@ ul,ol{ padding: 0; list-style: none; }
   window.addEventListener("hashchange", applyHash);
 
   renderUser();
+  syncFavButtons();
+  renderResume();
+  applyFilter();
   applyHash();
   if (location.search.indexOf("reason=expired") >= 0) openModal("login", true);
 })();
