@@ -374,7 +374,7 @@ async function verifyGate(value, env) {
 // 1) 首页两个形式；2) 白名单页面（正则有右边界，见 fetch 内注释）；
 // 3) 排除带非 html 扩展名的静态资源（.json/.svg/.jpg/.swf…）——注意不能一刀切排除所有带扩展名的
 //    路径，否则 /minecraft.html 这种真页面会被绕过，门禁直接失效。
-const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin|admin|chat)(?:[\/\?#.]|$)/;
+const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin|admin|chat|games)(?:[\/\?#.]|$)/;
 const GATE_STATIC_EXT_RE = /\.(?!html?$)[a-z0-9]{1,8}$/i;
 function needsGate(path) {
   if (path === "/" || path === "/index.html") return true;
@@ -1376,7 +1376,8 @@ async function serveAsset(request, env, path) {
   // 不会返回 text/html，所以无需再按扩展名分流。
   // 因此：路径不在已知页面集合内 且 仍返回 200 + HTML => 就是 Pages 回落首页，改判真 404。
   // （/robots.txt、/404.html 若文件不存在，同样会回落，这里一并按 404 处理，避免软 404。）
-  if (resp.status === 200 && !KNOWN_PAGE_PATHS.has(path)) {
+  // /games/** 是开源 H5 游戏的多文件目录，真实存在，豁免软 404 改判。
+  if (resp.status === 200 && !KNOWN_PAGE_PATHS.has(path) && !path.startsWith("/games/")) {
     return notFoundResponse(new URL(request.url), env, body, path === "/404.html");
   }
 

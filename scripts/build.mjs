@@ -19,7 +19,7 @@
  * 找不到再退回仓库根目录。目录重构前后都能跑。
  */
 
-import { open, copyFile, mkdir, rm, stat, writeFile, readFile } from "node:fs/promises";
+import { open, copyFile, mkdir, rm, stat, writeFile, readFile, cp } from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { once } from "node:events";
@@ -64,6 +64,9 @@ const EXTRA = [
 
 // 永不进 dist/（白名单之外的一切都进不来，这里只是让构建日志说清楚）
 const EXCLUDED = ["docs/", "scripts/", "_backup/", "_shots/", "dist/", "*.log"];
+
+// GitHub 开源 H5 游戏目录（games/<id>/ 整目录进 dist/games/<id>/，许可证随目录内 LICENSE 文件）
+const GAME_DIRS = ["pacman", "floppybird", "tetris", "astray"];
 
 // 4 个大包的 <head> 元信息重写表（P0-10）
 // 体积口径 MiB，与 games.json 的 size 一致
@@ -533,6 +536,25 @@ async function main() {
     await mkdir(path.dirname(destAbs), { recursive: true });
     await copyFile(path.join(ROOT, srcRel), destAbs);
     copied.push({ rel, src: srcRel, size: (await stat(destAbs)).size, cleaned: false });
+  }
+
+  // --- GitHub 开源 H5 游戏目录（整目录拷贝） ---
+  for (const dir of GAME_DIRS) {
+    const srcDir = path.join(ROOT, "games", dir);
+    let ok = true;
+    try { await stat(srcDir); } catch { ok = false; }
+    if (!ok) fail(`游戏目录缺失：games/${dir}`);
+    await cp(srcDir, path.join(DIST, "games", dir), { recursive: true });
+    let size = 0, count = 0;
+    const walk = async (d) => {
+      for (const e of await (await import("node:fs/promises")).readdir(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) await walk(p);
+        else { size += (await stat(p)).size; count += 1; }
+      }
+    };
+    await walk(srcDir);
+    log(`games/${dir}: ${count} 个文件, ${(size / 1048576).toFixed(1)} MB`);
   }
 
   // --- 4 个大包：覆盖上面的原样拷贝，做 <head> 清理 ---
