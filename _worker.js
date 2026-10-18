@@ -374,7 +374,7 @@ async function verifyGate(value, env) {
 // 1) 首页两个形式；2) 白名单页面（正则有右边界，见 fetch 内注释）；
 // 3) 排除带非 html 扩展名的静态资源（.json/.svg/.jpg/.swf…）——注意不能一刀切排除所有带扩展名的
 //    路径，否则 /minecraft.html 这种真页面会被绕过，门禁直接失效。
-const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin|admin)(?:[\/\?#.]|$)/;
+const GATE_PAGE_RE = /^\/(tools|media|guestbook|game|game2048|minesweeper|snake|minecraft|minecraft-1122|minecraft-125|minecraft-classic|account|ai-admin|admin|chat)(?:[\/\?#.]|$)/;
 const GATE_STATIC_EXT_RE = /\.(?!html?$)[a-z0-9]{1,8}$/i;
 function needsGate(path) {
   if (path === "/" || path === "/index.html") return true;
@@ -1164,14 +1164,24 @@ export default {
           //   1) 只保留最后 10 轮（原 20）
           //   2) 所有 content 字符总数 ≤8000，超出从最旧的消息开始丢
           //      —— 保留尾部而不是砍尾部：最后一条就是用户这次的问题，砍掉等于对话直接断掉
-          let msgSafe = messages.slice(-10).map(m => ({ role: String(m.role || "user").slice(0, 10), content: String(m.content || "") }));
-          let total = msgSafe.reduce((s, m) => s + m.content.length, 0);
+          // content 支持两种形态：字符串，或 OpenAI 多模态数组（[{type:'text'|'image_url',…}]）。
+          // 数组原样透传（上游才收得了图），体积按 text 部分估算。
+          const contentSize = (c) => typeof c === "string" ? c.length
+            : (Array.isArray(c) ? c.reduce((s, p) => s + (p && p.type === "text" && p.text ? p.text.length : (p && p.image_url ? 800 : 0)), 0) : 0);
+          let msgSafe = messages.slice(-10).map(m => ({ role: String(m.role || "user").slice(0, 10), content: m.content == null ? "" : m.content }));
+          let total = msgSafe.reduce((s, m) => s + contentSize(m.content), 0);
           while (msgSafe.length > 1 && total > 8000) {
-            total -= msgSafe.shift().content.length;
+            total -= contentSize(msgSafe.shift().content);
           }
           if (total > 8000) {
-            // 只剩一条还是超，就截这条的尾部内容（保最新、丢开头）
-            msgSafe = [{ ...msgSafe[0], content: msgSafe[0].content.slice(-8000) }];
+            // 只剩一条还是超：字符串截尾保最新；多模态数组只留文本部分并截尾
+            const c0 = msgSafe[0].content;
+            msgSafe = [{
+              ...msgSafe[0],
+              content: typeof c0 === "string"
+                ? c0.slice(-8000)
+                : [{ type: "text", text: String((Array.isArray(c0) ? c0 : []).map(p => (p && p.text) || "").join("\n")).slice(-8000) }]
+            }];
           }
           // max_tokens 默认 800：不传的话上游可能给到 4k，单次成本差好几倍
           const mt = Number(body.max_tokens);
@@ -1195,21 +1205,77 @@ export default {
           }
           // 计数写入放到后台：请求已经放行，写失败也不该让这次对话失败
           aiRateCommit(env, ctx, rl);
+          // 通用AI助手前端走 SSE 流式（body.stream === true）；站内旧 UI 走非流式 JSON
+          const wantStream = body.stream === true;
           const up = await fetch(baseURL.replace(/\/+$/, "") + "/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-            body: JSON.stringify({ model, messages: msgSafe, temperature, max_tokens: maxTokens, stream: false })
+            body: JSON.stringify({ model, messages: msgSafe, temperature, max_tokens: maxTokens, stream: wantStream })
           });
-          const data = await up.json().catch(() => ({}));
           if (!up.ok) {
+            const data = await up.json().catch(() => ({}));
             const msg = data.error && data.error.message ? data.error.message : JSON.stringify(data).slice(0, 200);
             return json({ error: `上游错误 ${up.status}: ${msg}`, code: "upstream_error" }, 502, true);
           }
-          const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
-          return json({ ok: true, content }, 200, true);
+          if (!wantStream) {
+            const data = await up.json().catch(() => ({}));
+            const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
+            return json({ ok: true, content }, 200, true);
+          }
+          // SSE 透传：把上游的 OpenAI delta 流归一化成 {content: "…"} 行，
+          // 前端同时兼容 OpenAI 格式和这个自定义格式，统一成后者最省事
+          const sse = new TransformStream();
+          const w = sse.writable.getWriter();
+          const enc = new TextEncoder();
+          ctx.waitUntil((async () => {
+            const reader = up.body.getReader();
+            const dec = new TextDecoder();
+            let buf = "";
+            try {
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() ?? "";
+                for (const line of lines) {
+                  const t = line.trim();
+                  if (!t.startsWith("data:")) continue;
+                  const payload = t.slice(5).trim();
+                  if (payload === "[DONE]") { await w.write(enc.encode("data: [DONE]\n\n")); continue; }
+                  try {
+                    const j = JSON.parse(payload);
+                    const piece = j.choices && j.choices[0] && j.choices[0].delta ? (j.choices[0].delta.content || "") : "";
+                    if (piece) await w.write(enc.encode(`data: ${JSON.stringify({ content: piece })}\n\n`));
+                  } catch (e) { /* 忽略心跳等非 JSON 行 */ }
+                }
+              }
+              await w.write(enc.encode("data: [DONE]\n\n"));
+            } catch (e) {
+              // 上游中断：给前端一条错误块，别让它挂着等
+              try { await w.write(enc.encode(`data: ${JSON.stringify({ error: "上游连接中断: " + e.message })}\n\n`)); await w.write(enc.encode("data: [DONE]\n\n")); } catch (e2) {}
+            } finally { try { await w.close(); } catch (e2) {} }
+          })().catch(() => {}));
+          return new Response(sse.readable, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "Cache-Control": "no-store",
+              "X-Accel-Buffering": "no",
+              ...SECURITY_HEADERS
+            }
+          });
         } catch (e) { return json({ error: `代理失败: ${e.message}`, code: "proxy_failed" }, 500, true); }
       }
       return json({ error: "method not allowed" }, 405, true);
+    }
+
+    // ---------- 通用AI助手（React 应用，挂在 /chat 路径） ----------
+    // 应用自带 BrowserRouter（basename "/"），路由只有 /chat 与 /chat/:sessionId。
+    // 静态资源 /assets/*、/icons.svg、/favicon.svg 是普通文件，走下面 serveAsset 即可；
+    // 页面本体在这里改写成 chat.html，让 /chat 和刷新时的 /chat/:id 都能拿到入口。
+    if (path === "/chat" || path.startsWith("/chat/")) {
+      return serveAsset(request, env, "/chat.html");
     }
 
     // ---------- 静态资源 ----------
@@ -1233,6 +1299,7 @@ const KNOWN_PAGE_PATHS = new Set([
   "/account", "/account.html",
   "/ai-admin", "/ai-admin.html",
   "/admin", "/admin.html",
+  "/chat",
   "/game", "/game.html",
   "/game2048", "/game2048.html",
   "/minesweeper", "/minesweeper.html",

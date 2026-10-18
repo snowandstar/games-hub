@@ -57,7 +57,9 @@ const PAGES = [
 const EXTRA = [
   "_worker.js", "robots.txt", "default.svg", "bh32.jpg", "bh33.jpg", "games.json",
   // PWA
-  "manifest.webmanifest", "sw.js", "offline.html", "icon-192.png", "icon-512.png"
+  "manifest.webmanifest", "sw.js", "offline.html", "icon-192.png", "icon-512.png",
+  // AI 助手（通用AI助手 React 应用，挂在 /chat 路径）
+  "chat.html", "assets/index-YIX3yDH6.js", "icons.svg", "favicon.svg"
 ];
 
 // 永不进 dist/（白名单之外的一切都进不来，这里只是让构建日志说清楚）
