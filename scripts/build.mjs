@@ -66,7 +66,7 @@ const EXTRA = [
 const EXCLUDED = ["docs/", "scripts/", "_backup/", "_shots/", "dist/", "*.log"];
 
 // GitHub 开源 H5 游戏目录（games/<id>/ 整目录进 dist/games/<id>/，许可证随目录内 LICENSE 文件）
-const GAME_DIRS = ["pacman", "floppybird", "tetris", "astray"];
+const GAME_DIRS = ["pacman", "floppybird", "tetris", "astray", "hexgl", "radiusraid", "asteroids", "blackholesquare"];
 
 // 4 个大包的 <head> 元信息重写表（P0-10）
 // 体积口径 MiB，与 games.json 的 size 一致

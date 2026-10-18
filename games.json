@@ -91,10 +91,50 @@
     "name": "吃豆人",
     "type": "h5",
     "group": "quick",
-    "size": 0.3,
-    "desc": "经典街机吃豆子，方向键躲幽灵（GitHub 开源）",
+    "size": 0.1,
+    "desc": "经典街机吃豆子，方向键躲幽灵（mumuy/pacman 开源版）",
     "icon": "/default.svg",
     "url": "/games/pacman/index.html"
+  },
+  {
+    "id": "hexgl",
+    "name": "HexGL 3D 竞速",
+    "type": "h5",
+    "group": "quick",
+    "size": 10.7,
+    "desc": "未来感 3D 竞速，WASD 或方向键驾驶（BKcore/HexGL 开源）",
+    "icon": "/default.svg",
+    "url": "/games/hexgl/index.html"
+  },
+  {
+    "id": "radiusraid",
+    "name": "Radius Raid 太空战",
+    "type": "h5",
+    "group": "quick",
+    "size": 0.1,
+    "desc": "13KB 的太空射击，鼠标瞄准开火（js13k 开源）",
+    "icon": "/default.svg",
+    "url": "/games/radiusraid/index.html"
+  },
+  {
+    "id": "asteroids",
+    "name": "小行星",
+    "type": "h5",
+    "group": "quick",
+    "size": 0.2,
+    "desc": "经典 Asteroids，方向键加空格射击（GitHub 开源）",
+    "icon": "/default.svg",
+    "url": "/games/asteroids/index.html"
+  },
+  {
+    "id": "blackholesquare",
+    "name": "黑洞方块",
+    "type": "h5",
+    "group": "quick",
+    "size": 0.1,
+    "desc": "烧脑益智，把方块推进黑洞（js13k 开源）",
+    "icon": "/default.svg",
+    "url": "/games/blackholesquare/index.html"
   },
   {
     "id": "floppybird",
