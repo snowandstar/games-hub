@@ -84,10 +84,17 @@ body {
     <h3 id="formTitle">添加预设</h3>
     <input class="field" id="fName" placeholder="显示名称（如：DeepSeek 对话）">
     <div class="grid2">
-      <input class="field" id="fBase" placeholder="API 地址（如 https://api.deepseek.com）">
-      <input class="field" id="fModel" placeholder="模型名（如 deepseek-chat）">
+      <input class="field" id="fBase" placeholder="API 地址（如 https://api.deepseek.com/v1）">
+      <div style="position:relative;">
+        <input class="field" id="fModel" placeholder="模型名（如 deepseek-chat）" list="modelList" autocomplete="off">
+        <datalist id="modelList"></datalist>
+      </div>
     </div>
     <input class="field" id="fKey" placeholder="API Key（仅站长可见，保存后列表不显示）" autocomplete="off">
+    <div style="margin:-4px 0 6px;">
+      <button class="btn ghost" id="fetchModelsBtn" type="button">一键获取模型</button>
+      <span style="font-size:12px;color:#8a92b8;">填好 API 地址和 Key 后点这里，自动拉取该服务商的可用模型列表，在「模型名」框里直接选</span>
+    </div>
     <input class="field" id="fDesc" placeholder="描述（选填，如：性价比高）">
     <div class="err" id="errBox"></div>
     <div class="okmsg" id="okBox"></div>
@@ -208,6 +215,31 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("cancelBtn").addEventListener("click", resetForm);
+
+// 一键获取模型：走 Worker 代理调服务商 GET /models（浏览器直连有 CORS）
+document.getElementById("fetchModelsBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("fetchModelsBtn");
+  const baseURL = document.getElementById("fBase").value.trim();
+  const key = document.getElementById("fKey").value.trim();
+  if (!baseURL || !key) { setErr("先填好 API 地址和 API Key，再一键获取模型"); return; }
+  setErr("");
+  btn.disabled = true; btn.textContent = "获取中…";
+  try {
+    const res = await fetch("/api/ai/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + getToken() },
+      body: JSON.stringify({ baseURL, key })
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!d.ok) { setErr(d.error || "获取失败"); return; }
+    document.getElementById("modelList").innerHTML = d.models.map(m => `<option value="${esc(m)}">`).join("");
+    setOk(`获取到 ${d.models.length} 个模型，点击「模型名」输入框即可下拉选择`);
+  } catch (e) {
+    setErr("获取失败：" + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "一键获取模型";
+  }
+});
 
 (async () => {
   const u = getUser();

@@ -1149,7 +1149,35 @@ export default {
         await env.MSG_KV.put("ai_presets", JSON.stringify(next));
         return json({ ok: true }, 200, true);
       }
-      // 聊天代理（登录可用；预设模式用站长 Key，个人模式用用户自带 Key）
+      // 一键获取模型列表（管理员）：代理调服务商的 GET /models，
+    // 浏览器直连会被 CORS 拦，所以走 Worker；地址是用户填的，照例过 SSRF 检查
+    if (path === "/api/ai/models" && request.method === "POST") {
+      const auth = await getAuth(request, env);
+      if (!auth || !auth.admin) return json({ error: "需要管理员权限", code: "admin_required" }, 403, true);
+      try {
+        const body = await request.json();
+        const baseURL = String(body.baseURL || "").trim();
+        const apiKey = String(body.key || "").trim();
+        if (!baseURL || !apiKey) return json({ error: "请提供 API 地址和 Key", code: "params_required" }, 400, true);
+        const bad = ssrfCheck(baseURL);
+        if (bad) return bad;
+        const up = await fetch(baseURL.replace(/\/+$/, "") + "/models", {
+          headers: { "Authorization": "Bearer " + apiKey }
+        });
+        const data = await up.json().catch(() => ({}));
+        if (!up.ok) {
+          const msg = data.error && data.error.message ? data.error.message : JSON.stringify(data).slice(0, 200);
+          return json({ error: `上游错误 ${up.status}: ${msg}`, code: "upstream_error" }, 502, true);
+        }
+        // 兼容两种返回：OpenAI 风格 {data:[{id}]} 与简单数组 {models:[...]}
+        let ids = [];
+        if (Array.isArray(data.data)) ids = data.data.map(m => (m && (m.id || m.name)) || "");
+        else if (Array.isArray(data.models)) ids = data.models.map(m => (typeof m === "string" ? m : (m && (m.id || m.name)) || ""));
+        ids = [...new Set(ids.filter(Boolean))].sort();
+        return json({ ok: true, models: ids }, 200, true);
+      } catch (e) { return json({ error: `获取失败: ${e.message}`, code: "proxy_failed" }, 502, true); }
+    }
+    // 聊天代理（登录可用；预设模式用站长 Key，个人模式用用户自带 Key）
       if (path === "/api/ai/chat" && request.method === "POST") {
         const auth = await getAuth(request, env);
         if (!auth) return json({ error: "未登录", code: "unauthorized" }, 401, true);
