@@ -58,8 +58,8 @@ const EXTRA = [
   "_worker.js", "robots.txt", "default.svg", "bh32.jpg", "bh33.jpg", "games.json",
   // PWA
   "manifest.webmanifest", "sw.js", "offline.html", "icon-192.png", "icon-512.png",
-  // AI 助手（通用AI助手 React 应用，挂在 /chat 路径）
-  "chat.html", "assets/index-YIX3yDH6.js", "icons.svg", "favicon.svg"
+  // AI 助手（通用AI助手 React 应用，挂在 /chat 路径；入口放 chat-app/ 目录避免 Pages 对 .html 的 308 归一化）
+  "chat-app/index.html", "assets/index-YIX3yDH6.js", "icons.svg", "favicon.svg"
 ];
 
 // 永不进 dist/（白名单之外的一切都进不来，这里只是让构建日志说清楚）

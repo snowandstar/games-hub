@@ -1279,9 +1279,10 @@ export default {
       return Response.redirect(new URL("/chat", url).toString(), 302);
     }
     if (path === "/chat" || path.startsWith("/chat/")) {
-      // 关键：要让 ASSETS 拉的是 /chat.html 这个真实文件（/chat 本身会被 Pages 软 404 回落 index），
-      // 同时 known-check 的 path 参数也要与之一致（/chat.html 在 KNOWN_PAGE_PATHS 里）
-      return serveAsset(new Request(new URL("/chat.html", url).toString(), request), env, "/chat.html");
+      // 关键：让 ASSETS 拉 /chat-app/（目录索引原生 200，没有 .html 的 308 归一化），
+      // known-check 的 path 参数用同一路径（在 KNOWN_PAGE_PATHS 里）。
+      // 注意 assets/ 与 icons.svg 在站点根（浏览器 URL 是 /chat，相对引用解析到 /assets/*）。
+      return serveAsset(new Request(new URL("/chat-app/", url).toString(), request), env, "/chat-app/");
     }
 
     // ---------- 静态资源 ----------
@@ -1305,7 +1306,7 @@ const KNOWN_PAGE_PATHS = new Set([
   "/account", "/account.html",
   "/ai-admin", "/ai-admin.html",
   "/admin", "/admin.html",
-  "/chat", "/chat.html",
+  "/chat", "/chat-app/",
   "/game", "/game.html",
   "/game2048", "/game2048.html",
   "/minesweeper", "/minesweeper.html",

@@ -1270,7 +1270,7 @@ ul,ol{ padding: 0; list-style: none; }
   }
 
   /* ---------------- AI 助手（自托管的通用AI助手应用，iframe 内嵌 /chat） ----------------
-     应用构建产物在仓库根 chat.html + assets/，路由 basename 为 "/"，挂在 /chat 路径。
+     应用构建产物在仓库 chat-app/index.html + assets/，路由 basename 为 "/"，挂在 /chat 路径。
      登录 token 通过 postMessage 握手传给 iframe（ghub-request-token / ghub-token），
      应用拿 token 调同源的 /api/ai/presets 与 /api/ai/chat（SSE 流式）。 */
   var aiLoaded = false;
