@@ -1252,6 +1252,13 @@ export default {
             if (!env.AI) {
               return json({ error: "站点未启用 Workers AI（管理员需在 Pages 设置里添加 AI 绑定）", code: "ai_binding_missing" }, 502, true);
             }
+            // 每日硬封顶：免费额度 10k 神经元/天，这里再加一道代码层限制（2000 次/天），双保险不产生账单
+            const dayKey = "wai_cnt:" + new Date().toISOString().slice(0, 10);
+            const used = parseInt((await env.MSG_KV.get(dayKey)) || "0", 10);
+            if (used >= 2000) {
+              return json({ error: "今天的免费 AI 额度已用完（上限 2000 次/天），明天再来吧", code: "wai_daily_cap" }, 429, true);
+            }
+            ctx.waitUntil(env.MSG_KV.put(dayKey, String(used + 1), { expirationTtl: 172800 }).catch(() => {}));
             // Workers AI 不吃多模态数组：content 数组压成纯文本
             const cfMessages = msgSafe.map(m => ({
               role: m.role,
