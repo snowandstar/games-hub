@@ -72,6 +72,7 @@ const CSP_REPORT_ONLY = [
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
+  "X-Site-Version": "2026-10-18-wai", // 部署标记：验证 Workers AI 绑定是否随部署生效
   // 不用 same-origin：它连站内跳外链都不带 referrer，来源判断会失真
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Content-Security-Policy-Report-Only": CSP_REPORT_ONLY
