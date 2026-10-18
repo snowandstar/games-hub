@@ -1223,7 +1223,11 @@ export default {
           const tp = Number(body.temperature);
           const temperature = Number.isFinite(tp) ? Math.min(2, Math.max(0, tp)) : 0.7;
           let baseURL, model, apiKey;
-          if (body.preset_id) {
+          if (body.preset_id === "cf") {
+            // 内置免费预设（不存 KV）：绑定 env.AI 后可用
+            if (!env.AI) return json({ error: "站点未启用 Workers AI（管理员需在 Pages 设置里添加 AI 绑定）", code: "ai_binding_missing" }, 502, true);
+            baseURL = "workers-ai"; model = "@cf/qwen/qwen1.5-14b-chat-awq"; apiKey = "";
+          } else if (body.preset_id) {
             const list = (await env.MSG_KV.get("ai_presets", "json")) || [];
             const p = list.find(x => x.id === body.preset_id);
             if (!p) return json({ error: "预设模型不存在", code: "preset_not_found" }, 404, true);
