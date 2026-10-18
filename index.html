@@ -724,19 +724,26 @@ ul,ol{ padding: 0; list-style: none; }
 .steps li{ display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-3); align-items: start; }
 .steps .tip-num{ background: var(--surface-2); color: var(--text-2); }
 .steps span:last-child{ font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
-/* ---- AI 助手：自托管 React 应用（/chat），iframe 嵌入 ---- */
+/* ---- AI 助手：自托管 React 应用（/chat），沉浸式嵌入 ---- */
+#view-ai{
+  display: flex; flex-direction: column;
+  height: calc(100dvh - 158px); min-height: 460px;
+}
+#view-ai .view-head{ flex-shrink: 0; }
+#view-ai .view-head p{ margin-top: 4px; }
 .ai-frame-wrap{
-  margin-top: var(--sp-4);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
+  flex: 1; min-height: 0; margin-top: var(--sp-3);
+  border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
   background: var(--surface-1); overflow: hidden;
 }
 .ai-frame-wrap iframe{
-  width: 100%; height: calc(100dvh - 240px); min-height: 520px;
-  border: 0; display: block; background: var(--bg-base);
+  width: 100%; height: 100%; border: 0; display: block; background: transparent;
 }
-@media (max-width: 819px){ .ai-frame-wrap iframe{ min-height: 70dvh; } }
-.ai-note{ margin-top: var(--sp-4); font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); max-width: 560px; }
-.ai-note a{ color: var(--accent); }
+.ai-note{ margin-top: var(--sp-3); flex-shrink: 0; font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); }
+@media (max-width: 819px){
+  #view-ai{ height: calc(100dvh - 132px); min-height: 400px; }
+  #view-ai .view-head p{ display: none; }
+}
 
 /* =========================================================== 弹窗 */
 .modal-overlay{
@@ -950,6 +957,14 @@ ul,ol{ padding: 0; list-style: none; }
       <a class="mnav" href="/guestbook">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         留言板
+      </a>
+      <a class="mnav" href="/ai-admin" data-admin-only hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg>
+        AI 模型管理
+      </a>
+      <a class="mnav" href="/admin" data-admin-only hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        站长看板
       </a>
     </nav>
     <div class="user-box">
@@ -1679,6 +1694,8 @@ ul,ol{ padding: 0; list-style: none; }
     all("[data-user-slot]").forEach(function (b) { b.hidden = !logged; });
     all("[data-user-name]").forEach(function (a) { a.textContent = logged ? u.username : ""; });
     all("[data-user-admin]").forEach(function (s) { s.hidden = !(logged && u.admin); });
+    // 管理员专属导航（AI 模型管理 / 站长看板）
+    all("[data-admin-only]").forEach(function (a) { a.hidden = !(logged && u.admin); });
   }
 
   all("[data-login-btn]").forEach(function (b) {
