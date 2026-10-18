@@ -1098,7 +1098,7 @@ export default {
         const out = list.map(p => ({ id: p.id, name: p.name, baseURL: p.baseURL, model: p.model, desc: p.desc }));
         // 站点绑定了 Workers AI 时，自动补一个免 Key 的内置免费模型（baseURL 固定为 "workers-ai"）
         if (env.AI) {
-          out.unshift({ id: "cf", name: "Cloudflare 免费模型", baseURL: "workers-ai", model: "@cf/qwen/qwen1.5-14b-chat-awq", desc: "站点内置，免 Key 直接聊；能力较轻、每日额度有限" });
+          out.unshift({ id: "cf", name: "Cloudflare 免费模型", baseURL: "workers-ai", model: "@cf/qwen/qwen3-30b-a3b-fp8", desc: "站点内置，免 Key 直接聊；能力较轻、每日额度有限" });
         }
         return json({ ok: true, presets: out }, 200, true);
       }
@@ -1226,7 +1226,7 @@ export default {
           if (body.preset_id === "cf") {
             // 内置免费预设（不存 KV）：绑定 env.AI 后可用
             if (!env.AI) return json({ error: "站点未启用 Workers AI（管理员需在 Pages 设置里添加 AI 绑定）", code: "ai_binding_missing" }, 502, true);
-            baseURL = "workers-ai"; model = "@cf/qwen/qwen1.5-14b-chat-awq"; apiKey = "";
+            baseURL = "workers-ai"; model = "@cf/qwen/qwen3-30b-a3b-fp8"; apiKey = "";
           } else if (body.preset_id) {
             const list = (await env.MSG_KV.get("ai_presets", "json")) || [];
             const p = list.find(x => x.id === body.preset_id);
