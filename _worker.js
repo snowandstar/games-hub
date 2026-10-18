@@ -1094,7 +1094,12 @@ export default {
         const auth = await getAuth(request, env);
         if (!auth) return json({ error: "未登录" }, 401, true);
         const list = (await env.MSG_KV.get("ai_presets", "json")) || [];
-        return json({ ok: true, presets: list.map(p => ({ id: p.id, name: p.name, baseURL: p.baseURL, model: p.model, desc: p.desc })) }, 200, true);
+        const out = list.map(p => ({ id: p.id, name: p.name, baseURL: p.baseURL, model: p.model, desc: p.desc }));
+        // 站点绑定了 Workers AI 时，自动补一个免 Key 的内置免费模型（baseURL 固定为 "workers-ai"）
+        if (env.AI) {
+          out.unshift({ id: "cf", name: "Cloudflare 免费模型", baseURL: "workers-ai", model: "@cf/qwen/qwen1.5-14b-chat-awq", desc: "站点内置，免 Key 直接聊；能力较轻、每日额度有限" });
+        }
+        return json({ ok: true, presets: out }, 200, true);
       }
       // 新增预设（管理员）
       if (path === "/api/ai/presets" && request.method === "POST") {
@@ -1235,6 +1240,67 @@ export default {
           aiRateCommit(env, ctx, rl);
           // 通用AI助手前端走 SSE 流式（body.stream === true）；站内旧 UI 走非流式 JSON
           const wantStream = body.stream === true;
+
+          // ---- Cloudflare Workers AI 内置通道（preset baseURL === "workers-ai"）----
+          // 免 Key、走站点绑定的 env.AI，按每日免费额度计费；模型名是 @cf/... 形式
+          if (baseURL === "workers-ai") {
+            if (!env.AI) {
+              return json({ error: "站点未启用 Workers AI（管理员需在 Pages 设置里添加 AI 绑定）", code: "ai_binding_missing" }, 502, true);
+            }
+            // Workers AI 不吃多模态数组：content 数组压成纯文本
+            const cfMessages = msgSafe.map(m => ({
+              role: m.role,
+              content: typeof m.content === "string"
+                ? m.content
+                : (Array.isArray(m.content) ? m.content.map(p => (p && p.text) || "").filter(Boolean).join("\n") : String(m.content || ""))
+            }));
+            try {
+              if (wantStream) {
+                // env.AI.run(stream:true) 返回 SSE 流：data: {"response":"…"} … data: [DONE]
+                const aiStream = await env.AI.run(model, { messages: cfMessages, max_tokens: maxTokens, temperature, stream: true });
+                const sse = new TransformStream();
+                const w = sse.writable.getWriter();
+                const enc = new TextEncoder();
+                ctx.waitUntil((async () => {
+                  const reader = aiStream.getReader();
+                  const dec = new TextDecoder();
+                  let buf = "";
+                  try {
+                    for (;;) {
+                      const { done, value } = await reader.read();
+                      if (done) break;
+                      buf += dec.decode(value, { stream: true });
+                      const lines = buf.split("\n");
+                      buf = lines.pop() ?? "";
+                      for (const line of lines) {
+                        const t = line.trim();
+                        if (!t.startsWith("data:")) continue;
+                        const payload = t.slice(5).trim();
+                        if (payload === "[DONE]") { await w.write(enc.encode("data: [DONE]\n\n")); continue; }
+                        try {
+                          const j = JSON.parse(payload);
+                          const piece = j.response || "";
+                          if (piece) await w.write(enc.encode(`data: ${JSON.stringify({ content: piece })}\n\n`));
+                        } catch (e) { /* 忽略心跳 */ }
+                      }
+                    }
+                    await w.write(enc.encode("data: [DONE]\n\n"));
+                  } catch (e) {
+                    try { await w.write(enc.encode(`data: ${JSON.stringify({ error: "Workers AI 中断: " + e.message })}\n\n`)); await w.write(enc.encode("data: [DONE]\n\n")); } catch (e2) {}
+                  } finally { try { await w.close(); } catch (e2) {} }
+                })().catch(() => {}));
+                return new Response(sse.readable, {
+                  status: 200,
+                  headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no", ...SECURITY_HEADERS }
+                });
+              }
+              const result = await env.AI.run(model, { messages: cfMessages, max_tokens: maxTokens, temperature });
+              return json({ ok: true, content: result.response || "" }, 200, true);
+            } catch (e) {
+              return json({ error: `Workers AI 调用失败: ${e.message}`, code: "workers_ai_failed" }, 502, true);
+            }
+          }
+
           const up = await fetch(baseURL.replace(/\/+$/, "") + "/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
