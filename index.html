@@ -724,25 +724,18 @@ ul,ol{ padding: 0; list-style: none; }
 .steps li{ display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-3); align-items: start; }
 .steps .tip-num{ background: var(--surface-2); color: var(--text-2); }
 .steps span:last-child{ font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-2); }
-/* ---- AI 助手：自托管 React 应用（/chat），沉浸式嵌入 ---- */
-#view-ai{
-  display: flex; flex-direction: column;
-  height: calc(100dvh - 158px); min-height: 460px;
-}
-#view-ai .view-head{ flex-shrink: 0; }
-#view-ai .view-head p{ margin-top: 4px; }
+/* ---- AI 助手：全出血应用模式（.layout--app / .wrap--app 由 setView 切换） ---- */
+.layout--app{ height: 100dvh; }
+.layout--app .main{ display: flex; flex-direction: column; overflow: hidden; }
+.wrap--app{ max-width: none; margin: 0; width: 100%; padding: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.layout--app .site-foot{ display: none; }  /* footer 是 .main 的直接子元素，不在 .wrap 里 */
+#view-ai{ flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ai-frame-wrap{
-  flex: 1; min-height: 0; margin-top: var(--sp-3);
-  border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
-  background: var(--surface-1); overflow: hidden;
+  flex: 1; min-height: 0;
+  border: 0; border-radius: 0; background: transparent;
 }
 .ai-frame-wrap iframe{
   width: 100%; height: 100%; border: 0; display: block; background: transparent;
-}
-.ai-note{ margin-top: var(--sp-3); flex-shrink: 0; font-size: var(--fs-xs); line-height: var(--lh-xs); color: var(--text-muted); }
-@media (max-width: 819px){
-  #view-ai{ height: calc(100dvh - 132px); min-height: 400px; }
-  #view-ai .view-head p{ display: none; }
 }
 
 /* =========================================================== 弹窗 */
@@ -1142,17 +1135,11 @@ ul,ol{ padding: 0; list-style: none; }
         </section>
       </div>
 
-      <!-- ==================== AI 助手（通用AI助手应用，自托管在 /chat） ==================== -->
+      <!-- ==================== AI 助手（通用AI助手应用，自托管在 /chat；全出血无框） ==================== -->
       <div id="view-ai" hidden>
-        <div class="view-head">
-          <h2>AI 助手</h2>
-          <p>多轮会话、图片和文档都能聊。登录后默认用站长的预设模型，也能在应用设置里换成你自己的 API Key。</p>
-        </div>
-
         <div class="ai-frame-wrap" id="aiWrap">
           <iframe id="aiFrame" title="AI 助手" data-src="/chat" allow="clipboard-write; fullscreen"></iframe>
         </div>
-        <p class="ai-note">对话记录保存在你自己的浏览器里；API Key 同样只存本机，不会上传到本站服务器。</p>
       </div>
     </div>
 
@@ -1279,6 +1266,12 @@ ul,ol{ padding: 0; list-style: none; }
       if (a.getAttribute("data-view") === v) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
+
+    // AI 应用是全出血布局：把外层容器的留白、页脚都收掉（离开时恢复）
+    var layoutEl = document.querySelector(".layout");
+    var wrapEl = document.querySelector(".wrap");
+    if (layoutEl) layoutEl.classList.toggle("layout--app", isAi);
+    if (wrapEl) wrapEl.classList.toggle("wrap--app", isAi);
 
     if (isAi) enterAi();
     else if (!noScroll) try { window.scrollTo(0, 0); } catch (e) {}
