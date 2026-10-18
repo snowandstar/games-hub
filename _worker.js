@@ -1274,6 +1274,10 @@ export default {
     // 应用自带 BrowserRouter（basename "/"），路由只有 /chat 与 /chat/:sessionId。
     // 静态资源 /assets/*、/icons.svg、/favicon.svg 是普通文件，走下面 serveAsset 即可；
     // 页面本体在这里改写成 chat.html，让 /chat 和刷新时的 /chat/:id 都能拿到入口。
+    // /ai 是老入口习惯（老书签 / 手打地址），一律转正到 /chat，别让它落进 404。
+    if (path === "/ai" || path === "/AI" || path.startsWith("/ai/") || path.startsWith("/AI/")) {
+      return Response.redirect(new URL("/chat", url).toString(), 302);
+    }
     if (path === "/chat" || path.startsWith("/chat/")) {
       return serveAsset(request, env, "/chat.html");
     }
